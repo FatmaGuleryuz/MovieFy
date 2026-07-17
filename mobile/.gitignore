@@ -1,0 +1,37 @@
+# Hassas Bilgiler (API Anahtarları)
+.env
+.env.local
+.env.*.local
+
+# Bağımlılıklar (Yüklenecek kütüphaneler)
+node_modules/
+jspm_packages/
+web_packages/
+
+# Android'e özel derleme dosyaları
+android/app/build/
+android/.gradle/
+android/local.properties
+*.apk
+*.aar
+*.keystore
+
+# iOS'a özel derleme dosyaları
+ios/build/
+ios/Pods/
+ios/.xcode.env.local
+DerivedData/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+
+# Editör ve Sistem Dosyaları
+.DS_Store
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
