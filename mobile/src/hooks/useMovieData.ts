@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { movieService } from '../api/services';
 
-// Özel hook: Ana sayfa için gerekli tüm verileri tek yerden ve güvenli yönetir
+
 export const useMovieData = () => {
   const [data, setData] = useState({
     trending: [],
@@ -18,7 +18,7 @@ export const useMovieData = () => {
       setLoading(true);
       setError(null);
 
-      // 5 farklı API isteğini paralel olarak güvenle çalıştırıyoruz
+      // 5 farklı API istegini paralel olarak calıstırıyoruz
       const [trending, popularMovies, popularTV, nowPlaying, topRated] = await Promise.all([
         movieService.getTrending(),
         movieService.getPopularMovies(),
@@ -45,6 +45,6 @@ export const useMovieData = () => {
     getAllData();
   }, []);
 
-  // Ekranın kullanacağı her şeyi dışarı aktarıyoruz
+
   return { ...data, loading, error, refetch: getAllData };
 };

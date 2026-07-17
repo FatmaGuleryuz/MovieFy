@@ -1,6 +1,6 @@
 import { BASE_URL, getHeaders } from './config';
 
-// Ortak fetch istek sarmalayıcısı (Hata yönetimi için)
+
 async function fetchFromTMDB(endpoint: string) {
   try {
     const response = await fetch(`${BASE_URL}${endpoint}?language=tr-TR&page=1`, {
