@@ -1,35 +1,32 @@
 import React from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { Image } from 'expo-image';
+import { useNavigation } from '@react-navigation/native';
 import { getImageUrl } from '../api/config';
 
-interface MovieCardProps {
-  item: {
-    id: number;
-    poster_path: string | null;
-    title?: string;
-    name?: string;
-    vote_average: number;
-  };
-}
-
-export const MovieCard: React.FC<MovieCardProps> = ({ item }) => {
+export const MovieCard = ({ item }) => {
+  const navigation = useNavigation();
   const title = item.title || item.name || 'İsimsiz İçerik';
   const rating = item.vote_average ? item.vote_average.toFixed(1) : '0.0';
 
+  // Dizi ve Film ayrımını title / name varlığına göre yapıp parametre ile geçiriyoruz
+  const handlePress = () => {
+    const type = item.first_air_date || item.name ? 'tv' : 'movie';
+    navigation.navigate('Detay', { id: item.id, type: type });
+  };
+
   return (
     <Pressable 
-      onLongPress={() => alert(title)} // Dokumandaki basılı tutma durumu icin gecici aksiyon
+      onPress={handlePress}
+      onLongPress={() => alert(title)}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
-     
       <Image
         source={{ uri: getImageUrl(item.poster_path, 'w500') }}
         style={styles.image}
         contentFit="cover"
         transition={200}
       />
-      
       
       <View style={styles.badge}>
         <Text style={styles.badgeText}>⭐ {rating}</Text>

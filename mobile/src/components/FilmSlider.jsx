@@ -2,12 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View, FlatList } from 'react-native';
 import { MovieCard } from './FilmKarti';
 
-interface MovieSliderProps {
-  title: string;
-  data: any[];
-}
-
-export const MovieSlider: React.FC<MovieSliderProps> = ({ title, data }) => {
+export const MovieSlider = ({ title, data }) => {
   if (!data || data.length === 0) return null;
 
   return (
