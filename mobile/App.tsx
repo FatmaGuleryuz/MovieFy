@@ -1,12 +1,14 @@
 import React from 'react';
-import { StyleSheet, Pressable, View } from 'react-native';
+import { StyleSheet, Pressable } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import PlayerEkran from './src/screens/PlayerEkrani';
 
 import AnaEkran from './src/screens/AnaEkran';
+import KesfetEkran from './src/screens/KesfetEkrani'; // Keşfet ekranı eklendi
 import AramaEkran from './src/screens/AramaEkrani';
 import DetayEkran from './src/screens/DetayEkrani';
 import KaydedilenlerEkran from './src/screens/Kaydedilenler'; 
@@ -25,7 +27,7 @@ function SekmeNavigasyonu() {
           backgroundColor: '#141414',
           borderTopWidth: 0,
           height: 60,
-          elevation: 0, // Tab bar altındaki gölgeyi sıfırladık
+          elevation: 0, // Tab bar altındaki gölge sıfırlandı
           shadowOpacity: 0,
         },
         tabBarButton: ({ children, ref, ...props }) => (
@@ -42,6 +44,7 @@ function SekmeNavigasyonu() {
         ),
       }}
     >
+      {/* 1. Ana Sayfa */}
       <Sekme.Screen
         name="Ana Sayfa"
         component={AnaEkran}
@@ -57,6 +60,23 @@ function SekmeNavigasyonu() {
         }}
       />
 
+      {/* 2. Keşfet (YENİ) */}
+      <Sekme.Screen
+        name="Keşfet"
+        component={KesfetEkran}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <Ionicons
+              name={focused ? 'compass' : 'compass-outline'}
+              size={26}
+              color={focused ? '#7709e5' : '#8E8E93'}
+              style={focused ? styles.activeIconShadow : null}
+            />
+          ),
+        }}
+      />
+
+      {/* 3. Arama */}
       <Sekme.Screen
         name="Ara"
         component={AramaEkran}
@@ -72,6 +92,7 @@ function SekmeNavigasyonu() {
         }}
       />
       
+      {/* 4. Kaydedilenler */}
       <Sekme.Screen
         name="Kaydedilenler"
         component={KaydedilenlerEkran}
@@ -111,6 +132,11 @@ export default function App() {
               component={OyuncuEkran}
               options={{ headerShown: false }}
             />
+            <Yigin.Screen
+              name="Player"
+              component={PlayerEkran}
+              options={{ headerShown: false }}
+/>
           </Yigin.Navigator>
         </NavigationContainer>
       </SafeAreaView>

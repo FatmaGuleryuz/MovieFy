@@ -29,14 +29,12 @@ export default function AnaEkran() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="light" />
-
-      {/* Moviefy başlığı dahil tüm içerik tek bir ScrollView içinde */}
       <ScrollView 
         showsVerticalScrollIndicator={false} 
         contentContainerStyle={styles.scrollContent}
         style={styles.scrollView}
       >
-        {/* Sol Üst Marka Başlığı (Sayfa kaydırılınca yukarı kaçacak) */}
+        
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Moviefy</Text>
         </View>
