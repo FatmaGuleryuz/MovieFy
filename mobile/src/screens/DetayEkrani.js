@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, ActivityIndicator, Pressable, Linking, FlatList } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, ActivityIndicator, Pressable, Linking, FlatList, Modal, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { movieService } from '../api/services';
 import { getImageUrl } from '../api/config';
-import { MovieSlider } from '../components/FilmSlider';
 import { Ionicons } from '@expo/vector-icons';
+
+const { width } = Dimensions.get('window');
+// 2'li ızgara için kart genişliği hesabı (Ekran genişliği - pad'ler ve aradaki boşluk)
+const GRID_CARD_WIDTH = (width - 44) / 2;
 
 export default function DetayEkrani({ route, navigation }) {
   const { id, type = 'movie' } = route.params || {};
@@ -13,9 +16,15 @@ export default function DetayEkrani({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Aktif Sekme (Tab) Yönetimi
+  const [activeTab, setActiveTab] = useState(type === 'tv' ? 'episodes' : 'cast');
+
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [episodes, setEpisodes] = useState([]);
   const [loadingEpisodes, setLoadingEpisodes] = useState(false);
+
+  // Sezon Seçim Modalı Durumu
+  const [showSeasonModal, setShowSeasonModal] = useState(false);
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -91,15 +100,22 @@ export default function DetayEkrani({ route, navigation }) {
     }
   };
 
+  const playContent = (episodeTitle = '') => {
+    navigation.navigate('Player', {
+      title: episodeTitle ? `${title} - ${episodeTitle}` : title,
+      id: detail.id,
+    });
+  };
+
   return (
     <View style={styles.container}>
-      {/* Sol Üst Yüzen (Floating) Geri Tuşu */}
+      {/* Sol Üst Yüzen Geri Tuşu */}
       <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
         <Ionicons name="chevron-back" size={28} color="#fff" />
       </Pressable>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Büyütülmüş Arka Plan Görseli Katmanı */}
+        {/* Arka Plan Görsel Katmanı */}
         <View style={styles.backdropContainer}>
           <Image
             source={{ uri: getImageUrl(detail.backdrop_path || detail.poster_path, 'original') }}
@@ -107,10 +123,8 @@ export default function DetayEkrani({ route, navigation }) {
             contentFit="cover"
           />
           
-          {/* Görsel Üzerindeki Alt Karartma / Gölge Katmanı */}
           <View style={styles.backdropGradient} />
 
-          {/* Görselin İçine Yerleştirilmiş Poster ve Başlık Alanı */}
           <View style={styles.headerContent}>
             <Image
               source={{ uri: getImageUrl(detail.poster_path, 'w500') }}
@@ -121,57 +135,130 @@ export default function DetayEkrani({ route, navigation }) {
               <Text style={styles.title}>{title}</Text>
               <Text style={styles.genres}>{genres}</Text>
               <Text style={styles.meta}>
-                ⭐ {detail.vote_average?.toFixed(1)} {duration ? `| ⏱️ ${duration}` : ''}
+                ⭐ {detail.vote_average?.toFixed(1)} {duration ? `| ${duration}` : ''}
               </Text>
-              <Text style={styles.metaDate}>📅 {releaseDate}</Text>
+              <Text style={styles.metaDate}> {releaseDate}</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.content}>
-          {/* Fragman Butonu */}
-          {trailer && (
-            <Pressable style={styles.trailerButton} onPress={openTrailer}>
-              <Text style={styles.trailerButtonText}>▶ Fragmanı İzle</Text>
+          {/* Oynatma Butonları */}
+          <View style={styles.actionButtonsRow}>
+            <Pressable style={styles.playButton} onPress={() => playContent()}>
+              <Ionicons name="play" size={20} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={styles.playButtonText}>Şimdi İzle (Player)</Text>
             </Pressable>
-          )}
+
+            {trailer && (
+              <Pressable style={styles.trailerButton} onPress={openTrailer}>
+                <Ionicons name="logo-youtube" size={18} color="#de1a1a" style={{ marginRight: 6 }} />
+                <Text style={styles.trailerButtonText}>Fragman</Text>
+              </Pressable>
+            )}
+          </View>
 
           {/* Özet */}
           <Text style={styles.sectionTitle}>Özet</Text>
           <Text style={styles.overview}>{detail.overview || 'Özet bilgisi bulunmuyor.'}</Text>
 
-          {/* DİZİYE ÖZEL: Sezonlar */}
-          {type === 'tv' && detail.seasons?.length > 0 && (
-            <View style={styles.tvSection}>
-              <Text style={styles.sectionTitle}>Sezonlar & Bölümler</Text>
-              
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.seasonList}>
-                {detail.seasons.map((season) => (
-                  <Pressable
-                    key={season.id}
-                    style={[
-                      styles.seasonTab,
-                      selectedSeason === season.season_number && styles.activeSeasonTab,
-                    ]}
-                    onPress={() => setSelectedSeason(season.season_number)}
-                  >
-                    <Text
-                      style={[
-                        styles.seasonTabText,
-                        selectedSeason === season.season_number && styles.activeSeasonTabText,
-                      ]}
-                    >
-                      {season.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
+          {/* SEKMELİ KULLANICI SEÇİM ALANI (TAB BAR) */}
+          <View style={styles.tabContainer}>
+            {type === 'tv' && (
+              <Pressable
+                style={[styles.tabButton, activeTab === 'episodes' && styles.activeTabButton]}
+                onPress={() => setActiveTab('episodes')}
+              >
+                <Text style={[styles.tabButtonText, activeTab === 'episodes' && styles.activeTabButtonText]}>
+                  Bölümler
+                </Text>
+              </Pressable>
+            )}
+
+            <Pressable
+              style={[styles.tabButton, activeTab === 'cast' && styles.activeTabButton]}
+              onPress={() => setActiveTab('cast')}
+            >
+              <Text style={[styles.tabButtonText, activeTab === 'cast' && styles.activeTabButtonText]}>
+                Oyuncular
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.tabButton, activeTab === 'similar' && styles.activeTabButton]}
+              onPress={() => setActiveTab('similar')}
+            >
+              <Text style={[styles.tabButtonText, activeTab === 'similar' && styles.activeTabButtonText]}>
+                Benzer İçerikler
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* 1. SEÇENEK: BÖLÜMLER */}
+          {type === 'tv' && activeTab === 'episodes' && (
+            <View style={styles.tabContentSection}>
+              <Pressable
+                style={styles.seasonDropdownButton}
+                onPress={() => setShowSeasonModal(true)}
+              >
+                <Text style={styles.seasonDropdownText}>
+                  {detail.seasons?.find((s) => s.season_number === selectedSeason)?.name ||
+                    `${selectedSeason}. Sezon`}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#fff" />
+              </Pressable>
+
+              <Modal
+                visible={showSeasonModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowSeasonModal(false)}
+              >
+                <Pressable style={styles.modalBackdrop} onPress={() => setShowSeasonModal(false)}>
+                  <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>Sezon Seçin</Text>
+
+                    <FlatList
+                      data={detail.seasons}
+                      keyExtractor={(item) => item.id.toString()}
+                      renderItem={({ item }) => (
+                        <Pressable
+                          style={[
+                            styles.seasonOption,
+                            selectedSeason === item.season_number && styles.activeSeasonOption,
+                          ]}
+                          onPress={() => {
+                            setSelectedSeason(item.season_number);
+                            setShowSeasonModal(false);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.seasonOptionText,
+                              selectedSeason === item.season_number && styles.activeSeasonOptionText,
+                            ]}
+                          >
+                            {item.name} ({item.episode_count} Bölüm)
+                          </Text>
+                          {selectedSeason === item.season_number && (
+                            <Ionicons name="checkmark" size={20} color="#7709e5" />
+                          )}
+                        </Pressable>
+                      )}
+                    />
+                  </View>
+                </Pressable>
+              </Modal>
 
               {loadingEpisodes ? (
                 <ActivityIndicator size="small" color="#7709e5" style={{ marginVertical: 15 }} />
               ) : (
                 episodes.map((ep) => (
-                  <View key={ep.id} style={styles.episodeCard}>
+                  <Pressable 
+                    key={ep.id} 
+                    style={styles.episodeCard}
+                    onPress={() => playContent(`${ep.season_number}.Sezon ${ep.episode_number}.Bölüm`)}
+                  >
                     <Text style={styles.episodeNumber}>{ep.episode_number}. Bölüm</Text>
                     <View style={styles.episodeInfo}>
                       <Text style={styles.episodeTitle}>{ep.name}</Text>
@@ -179,43 +266,81 @@ export default function DetayEkrani({ route, navigation }) {
                         {ep.overview || 'Bölüm özeti bulunmuyor.'}
                       </Text>
                     </View>
-                  </View>
+                    <Ionicons name="play-circle-outline" size={26} color="#7709e5" />
+                  </Pressable>
                 ))
               )}
             </View>
           )}
 
-          {/* Cast Şeridi */}
-          {detail.credits?.cast?.length > 0 && (
-            <View style={styles.castSection}>
-              <Text style={styles.sectionTitle}>Oyuncular</Text>
-              <FlatList
-                data={detail.credits.cast.slice(0, 10)}
-                keyExtractor={(item) => item.id.toString()}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                renderItem={({ item }) => (
-                  <Pressable 
-                    style={styles.castCard}
-                    onPress={() => navigation.push('Oyuncu', { personId: item.id })}
-                  >
-                    <Image
-                      source={{ uri: getImageUrl(item.profile_path, 'w500') }}
-                      style={styles.castImage}
-                      contentFit="cover"
-                    />
-                    <Text style={styles.castName} numberOfLines={1}>{item.name}</Text>
-                    <Text style={styles.characterName} numberOfLines={1}>{item.character}</Text>
-                  </Pressable>
-                )}
-              />
+          {/* 2. SEÇENEK: OYUNCULAR (YAN YANA 2'Lİ DİZİLİM) */}
+          {activeTab === 'cast' && (
+            <View style={styles.tabContentSection}>
+              {detail.credits?.cast?.length > 0 ? (
+                <FlatList
+                  data={detail.credits.cast.slice(0, 16)}
+                  keyExtractor={(item) => item.id.toString()}
+                  numColumns={2}
+                  scrollEnabled={false} // Ana ScrollView ile çakışmaması için
+                  columnWrapperStyle={styles.gridRow}
+                  renderItem={({ item }) => (
+                    <Pressable 
+                      style={styles.gridCastCard}
+                      onPress={() => navigation.push('Oyuncu', { personId: item.id })}
+                    >
+                      <Image
+                        source={{ uri: getImageUrl(item.profile_path, 'w500') }}
+                        style={styles.gridCastImage}
+                        contentFit="cover"
+                      />
+                      <View style={styles.gridCardInfo}>
+                        <Text style={styles.castName} numberOfLines={1}>{item.name}</Text>
+                        <Text style={styles.characterName} numberOfLines={1}>{item.character}</Text>
+                      </View>
+                    </Pressable>
+                  )}
+                />
+              ) : (
+                <Text style={styles.emptyText}>Oyuncu bilgisi bulunamadı.</Text>
+              )}
             </View>
           )}
 
-          {/* Benzer İçerikler */}
-          {detail.similar?.results?.length > 0 && (
-            <View style={{ marginTop: 20 }}>
-              <MovieSlider title="Benzer İçerikler" data={detail.similar.results} />
+          {/* 3. SEÇENEK: BENZER İÇERİKLER (YAN YANA 2'Lİ FİLM KARTI DİZİLİMİ) */}
+          {activeTab === 'similar' && (
+            <View style={styles.tabContentSection}>
+              {detail.similar?.results?.length > 0 ? (
+                <FlatList
+                  data={detail.similar.results.slice(0, 12)}
+                  keyExtractor={(item) => item.id.toString()}
+                  numColumns={2}
+                  scrollEnabled={false} // Ana ScrollView ile çakışmaması için
+                  columnWrapperStyle={styles.gridRow}
+                  renderItem={({ item }) => {
+                    const itemTitle = item.title || item.name;
+                    const itemRating = item.vote_average ? item.vote_average.toFixed(1) : 'N/A';
+
+                    return (
+                      <Pressable 
+                        style={styles.gridMovieCard}
+                        onPress={() => navigation.push('Detay', { id: item.id, type: item.media_type || type })}
+                      >
+                        <Image
+                          source={{ uri: getImageUrl(item.poster_path, 'w500') }}
+                          style={styles.gridMovieImage}
+                          contentFit="cover"
+                        />
+                        <View style={styles.gridCardInfo}>
+                          <Text style={styles.gridMovieTitle} numberOfLines={1}>{itemTitle}</Text>
+                          <Text style={styles.gridMovieRating}>⭐ {itemRating}</Text>
+                        </View>
+                      </Pressable>
+                    );
+                  }}
+                />
+              ) : (
+                <Text style={styles.emptyText}>Benzer içerik bulunamadı.</Text>
+              )}
             </View>
           )}
         </View>
@@ -233,7 +358,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Sol Üst Yüzen Geri Tuşu
   backButton: {
     position: 'absolute',
     top: 45,
@@ -242,11 +366,10 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Şeffaf siyah daire
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Arka Plan Görsel Kapsayıcısı (Yükseklik 380px yapıldı)
   backdropContainer: {
     position: 'relative',
     height: 380,
@@ -258,7 +381,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  // Görselin altını karartan ve yazıları öne çıkaran gölge katmanı
   backdropGradient: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(20, 20, 20, 0.65)',
@@ -310,23 +432,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
   },
-  trailerButton: {
+  actionButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 20,
+  },
+  playButton: {
+    flex: 2,
+    flexDirection: 'row',
     backgroundColor: '#7709e5',
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 8,
     alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'center',
+  },
+  playButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  trailerButton: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#2a2a2a',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
   },
   trailerButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 15,
+    fontWeight: '600',
+    fontSize: 13,
   },
   sectionTitle: {
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   overview: {
     color: '#ccc',
@@ -334,28 +481,98 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 20,
   },
-  tvSection: {
-    marginBottom: 20,
+
+  // TAB BAR STİLLERİ
+  tabContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+    marginBottom: 16,
   },
-  seasonList: {
-    marginBottom: 12,
+  tabButton: {
+    paddingVertical: 10,
+    marginRight: 20,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
-  seasonTab: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#252525',
-    marginRight: 8,
+  activeTabButton: {
+    borderBottomColor: '#7709e5',
   },
-  activeSeasonTab: {
-    backgroundColor: '#7709e5',
+  tabButtonText: {
+    color: '#888',
+    fontSize: 15,
+    fontWeight: '600',
   },
-  seasonTabText: {
-    color: '#aaa',
-    fontSize: 13,
-  },
-  activeSeasonTabText: {
+  activeTabButtonText: {
     color: '#fff',
+    fontWeight: 'bold',
+  },
+  tabContentSection: {
+    marginBottom: 20,
+    minHeight: 120,
+  },
+
+  // SEZON DROPDOWN STİLLERİ
+  seasonDropdownButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#252525',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#333',
+    marginBottom: 16,
+  },
+  seasonDropdownText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxHeight: '60%',
+    backgroundColor: '#1f1f1f',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  modalTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+  },
+  seasonOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  activeSeasonOption: {
+    backgroundColor: 'rgba(119, 9, 229, 0.15)',
+  },
+  seasonOptionText: {
+    color: '#ccc',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  activeSeasonOptionText: {
+    color: '#7709e5',
     fontWeight: 'bold',
   },
   episodeCard: {
@@ -374,6 +591,7 @@ const styles = StyleSheet.create({
   },
   episodeInfo: {
     flex: 1,
+    marginRight: 8,
   },
   episodeTitle: {
     color: '#fff',
@@ -385,28 +603,62 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  castSection: {
-    marginBottom: 10,
+
+  // 2'Lİ IZGARA (GRID) STİLLERİ
+  gridRow: {
+    justifyContent: 'space-between',
+    marginBottom: 14,
   },
-  castCard: {
-    width: 90,
-    marginRight: 12,
+  gridCastCard: {
+    width: GRID_CARD_WIDTH,
+    backgroundColor: '#1c1c1e',
+    borderRadius: 8,
+    overflow: 'hidden',
   },
-  castImage: {
-    width: 90,
-    height: 120,
-    borderRadius: 6,
+  gridCastImage: {
+    width: '100%',
+    height: GRID_CARD_WIDTH * 1.25,
     backgroundColor: '#222',
-    marginBottom: 4,
+  },
+  gridMovieCard: {
+    width: GRID_CARD_WIDTH,
+    backgroundColor: '#1c1c1e',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  gridMovieImage: {
+    width: '100%',
+    height: GRID_CARD_WIDTH * 1.45,
+    backgroundColor: '#222',
+  },
+  gridCardInfo: {
+    padding: 8,
   },
   castName: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 'bold',
   },
   characterName: {
     color: '#888',
-    fontSize: 10,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  gridMovieTitle: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  gridMovieRating: {
+    color: '#aaa',
+    fontSize: 11,
+    marginTop: 4,
+  },
+  emptyText: {
+    color: '#777',
+    fontSize: 14,
+    fontStyle: 'italic',
+    marginTop: 10,
   },
   errorText: {
     color: '#7709e5',
