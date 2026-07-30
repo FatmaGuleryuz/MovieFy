@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, ActivityIndicator, Pressable, Linking, FlatList, Modal, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient'; // Yumuşak geçiş katmanı
 import { movieService } from '../api/services';
 import { getImageUrl } from '../api/config';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
-// 2'li ızgara için kart genişliği hesabı (Ekran genişliği - pad'ler ve aradaki boşluk)
 const GRID_CARD_WIDTH = (width - 44) / 2;
 
 export default function DetayEkrani({ route, navigation }) {
@@ -16,14 +16,12 @@ export default function DetayEkrani({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Aktif Sekme (Tab) Yönetimi
   const [activeTab, setActiveTab] = useState(type === 'tv' ? 'episodes' : 'cast');
 
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [episodes, setEpisodes] = useState([]);
   const [loadingEpisodes, setLoadingEpisodes] = useState(false);
 
-  // Sezon Seçim Modalı Durumu
   const [showSeasonModal, setShowSeasonModal] = useState(false);
 
   useEffect(() => {
@@ -83,7 +81,7 @@ export default function DetayEkrani({ route, navigation }) {
 
   const title = detail.title || detail.name;
   const releaseDate = detail.release_date || detail.first_air_date || 'Tarih Yok';
-  const genres = detail.genres ? detail.genres.map(g => g.name).join(', ') : 'Tür Belirtilmemiş';
+  const genres = detail.genres ? detail.genres.map(g => g.name).join(' • ') : 'Tür Belirtilmemiş';
   const duration = detail.runtime 
     ? `${detail.runtime} dk` 
     : detail.episode_run_time?.length 
@@ -109,13 +107,13 @@ export default function DetayEkrani({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Sol Üst Yüzen Geri Tuşu */}
+      {/* Sol Üst Geri Tuşu */}
       <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
         <Ionicons name="chevron-back" size={28} color="#fff" />
       </Pressable>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Arka Plan Görsel Katmanı */}
+        {/* ARKA PLAN GÖRSELİ VEYA YUMUŞAK GEÇİŞ ALANI */}
         <View style={styles.backdropContainer}>
           <Image
             source={{ uri: getImageUrl(detail.backdrop_path || detail.poster_path, 'original') }}
@@ -123,46 +121,52 @@ export default function DetayEkrani({ route, navigation }) {
             contentFit="cover"
           />
           
-          <View style={styles.backdropGradient} />
-
-          <View style={styles.headerContent}>
-            <Image
-              source={{ uri: getImageUrl(detail.poster_path, 'w500') }}
-              style={styles.poster}
-              contentFit="cover"
-            />
+          {/* 🌟 YUKARIDAN AŞAĞIYA DOĞRU YUMUŞAK SAYDAMLIK / GEÇİŞ KATMANI 🌟 */}
+          <LinearGradient
+            colors={['transparent', 'rgba(20,20,20,0.5)', 'rgba(20,20,20,0.95)', '#141414']}
+            locations={[0, 0.4, 0.75, 1]}
+            style={styles.gradientOverlay}
+          >
+            {/* Metin ve Bilgi Alanı */}
             <View style={styles.headerTextContainer}>
               <Text style={styles.title}>{title}</Text>
-              <Text style={styles.genres}>{genres}</Text>
-              <Text style={styles.meta}>
-                ⭐ {detail.vote_average?.toFixed(1)} {duration ? `| ${duration}` : ''}
-              </Text>
-              <Text style={styles.metaDate}> {releaseDate}</Text>
+              
+              <Text style={styles.genresText} numberOfLines={1}>{genres}</Text>
+
+              <View style={styles.ratingAndDateRow}>
+                <View style={styles.ratingTextWrapper}>
+                  <Ionicons name="star" size={14} color="#ffd700" style={{ marginRight: 4 }} />
+                  <Text style={styles.ratingText}>{detail.vote_average?.toFixed(1)}</Text>
+                </View>
+                <Text style={styles.metaText}>• {releaseDate}</Text>
+                {duration ? <Text style={styles.metaText}>• {duration}</Text> : null}
+              </View>
+
+              {/* Butonlar Tam Yumuşak Geçişin (Fade-Out) İçinde ve En Altta */}
+              <View style={styles.actionButtonsRow}>
+                <Pressable style={styles.playButton} onPress={() => playContent()}>
+                  <Ionicons name="play" size={20} color="#fff" style={{ marginRight: 6 }} />
+                  <Text style={styles.playButtonText}>Şimdi İzle (Player)</Text>
+                </Pressable>
+
+                {trailer && (
+                  <Pressable style={styles.trailerButton} onPress={openTrailer}>
+                    <Ionicons name="logo-youtube" size={18} color="#fff" style={{ marginRight: 6 }} />
+                    <Text style={styles.trailerButtonText}>Fragman</Text>
+                  </Pressable>
+                )}
+              </View>
             </View>
-          </View>
+          </LinearGradient>
         </View>
 
+        {/* İÇERİK BÖLÜMÜ */}
         <View style={styles.content}>
-          {/* Oynatma Butonları */}
-          <View style={styles.actionButtonsRow}>
-            <Pressable style={styles.playButton} onPress={() => playContent()}>
-              <Ionicons name="play" size={20} color="#fff" style={{ marginRight: 6 }} />
-              <Text style={styles.playButtonText}>Şimdi İzle (Player)</Text>
-            </Pressable>
-
-            {trailer && (
-              <Pressable style={styles.trailerButton} onPress={openTrailer}>
-                <Ionicons name="logo-youtube" size={18} color="#de1a1a" style={{ marginRight: 6 }} />
-                <Text style={styles.trailerButtonText}>Fragman</Text>
-              </Pressable>
-            )}
-          </View>
-
           {/* Özet */}
           <Text style={styles.sectionTitle}>Özet</Text>
           <Text style={styles.overview}>{detail.overview || 'Özet bilgisi bulunmuyor.'}</Text>
 
-          {/* SEKMELİ KULLANICI SEÇİM ALANI (TAB BAR) */}
+          {/* SEKMELER */}
           <View style={styles.tabContainer}>
             {type === 'tv' && (
               <Pressable
@@ -194,7 +198,7 @@ export default function DetayEkrani({ route, navigation }) {
             </Pressable>
           </View>
 
-          {/* 1. SEÇENEK: BÖLÜMLER */}
+          {/* BÖLÜMLER SEKMESİ */}
           {type === 'tv' && activeTab === 'episodes' && (
             <View style={styles.tabContentSection}>
               <Pressable
@@ -273,7 +277,7 @@ export default function DetayEkrani({ route, navigation }) {
             </View>
           )}
 
-          {/* 2. SEÇENEK: OYUNCULAR (YAN YANA 2'Lİ DİZİLİM) */}
+          {/* OYUNCULAR SEKMESİ */}
           {activeTab === 'cast' && (
             <View style={styles.tabContentSection}>
               {detail.credits?.cast?.length > 0 ? (
@@ -281,7 +285,7 @@ export default function DetayEkrani({ route, navigation }) {
                   data={detail.credits.cast.slice(0, 16)}
                   keyExtractor={(item) => item.id.toString()}
                   numColumns={2}
-                  scrollEnabled={false} // Ana ScrollView ile çakışmaması için
+                  scrollEnabled={false}
                   columnWrapperStyle={styles.gridRow}
                   renderItem={({ item }) => (
                     <Pressable 
@@ -306,7 +310,7 @@ export default function DetayEkrani({ route, navigation }) {
             </View>
           )}
 
-          {/* 3. SEÇENEK: BENZER İÇERİKLER (YAN YANA 2'Lİ FİLM KARTI DİZİLİMİ) */}
+          {/* BENZER İÇERİKLER SEKMESİ */}
           {activeTab === 'similar' && (
             <View style={styles.tabContentSection}>
               {detail.similar?.results?.length > 0 ? (
@@ -314,7 +318,7 @@ export default function DetayEkrani({ route, navigation }) {
                   data={detail.similar.results.slice(0, 12)}
                   keyExtractor={(item) => item.id.toString()}
                   numColumns={2}
-                  scrollEnabled={false} // Ana ScrollView ile çakışmaması için
+                  scrollEnabled={false}
                   columnWrapperStyle={styles.gridRow}
                   renderItem={({ item }) => {
                     const itemTitle = item.title || item.name;
@@ -370,72 +374,68 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  
+  // POSTER KUTUSU
   backdropContainer: {
     position: 'relative',
-    height: 380,
+    height: 440, // Fotoğraf alanı daha geniş tutuldu
     width: '100%',
-    justifyContent: 'flex-end',
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
   },
-  backdropGradient: {
+  // KADEMELİ VE YUMUŞAK GEÇİŞ SAĞLAYAN SİYAH KATMAN
+  gradientOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(20, 20, 20, 0.65)',
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: 16,
-    paddingBottom: 20,
-  },
-  poster: {
-    width: 115,
-    height: 165,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'flex-end',
   },
   headerTextContainer: {
-    flex: 1,
-    marginLeft: 14,
-    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
   },
   title: {
     color: '#fff',
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: 'bold',
-    marginBottom: 4,
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    marginBottom: 6,
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    textShadowRadius: 6,
   },
-  genres: {
-    color: '#7709e5',
-    fontSize: 12,
-    fontWeight: '700',
+  genresText: {
+    color: '#ccc',
+    fontSize: 13,
+    fontWeight: '500',
     marginBottom: 6,
   },
-  meta: {
-    color: '#eee',
+  ratingAndDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  ratingTextWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ratingText: {
+    color: '#fff',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
-  metaDate: {
+  metaText: {
     color: '#aaa',
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 13,
+    fontWeight: '500',
   },
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
+
+  // BUTON ALANI (GÖLGELİ ALANIN İÇİNDE)
   actionButtonsRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 20,
+    marginTop: 4,
   },
   playButton: {
     flex: 2,
@@ -455,19 +455,25 @@ const styles = StyleSheet.create({
   trailerButton: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#2a2a2a',
+    backgroundColor: 'rgba(37, 37, 37, 0.9)',
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#3a3a3a',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   trailerButtonText: {
     color: '#fff',
     fontWeight: '600',
     fontSize: 13,
+  },
+
+  // İÇERİK BÖLÜMÜ
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
   },
   sectionTitle: {
     color: '#fff',
@@ -482,7 +488,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  // TAB BAR STİLLERİ
+  // TAB BAR
   tabContainer: {
     flexDirection: 'row',
     borderBottomWidth: 1,
@@ -512,7 +518,7 @@ const styles = StyleSheet.create({
     minHeight: 120,
   },
 
-  // SEZON DROPDOWN STİLLERİ
+  // SEZON DROPDOWN
   seasonDropdownButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -604,7 +610,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // 2'Lİ IZGARA (GRID) STİLLERİ
+  // 2'Lİ IZGARA
   gridRow: {
     justifyContent: 'space-between',
     marginBottom: 14,
