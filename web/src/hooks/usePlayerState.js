@@ -1,55 +1,47 @@
 import { useReducer } from 'react';
 
-// Player Durumları (State Machine)
-export const PLAYER_STATES = {
-  IDLE: 'idle',
-  LOADING: 'loading',
-  PLAYING: 'playing',
-  PAUSED: 'paused',
-  BUFFERING: 'buffering',
-  ERROR: 'error'
-};
-
-// State Geçiş Eylemleri (Actions)
-export const PLAYER_ACTIONS = {
-  SET_LOADING: 'SET_LOADING',
-  SET_PLAYING: 'SET_PLAYING',
-  SET_PAUSED: 'SET_PAUSED',
-  SET_BUFFERING: 'SET_BUFFERING',
-  SET_ERROR: 'SET_ERROR',
-  SET_LEVELS: 'SET_LEVELS',
-  SET_CURRENT_LEVEL: 'SET_CURRENT_LEVEL'
-};
-
 const initialState = {
-  status: PLAYER_STATES.IDLE, // idle | loading | playing | paused | buffering | error
-  levels: [],                 // Kalite seviyeleri (1080p, 720p vb.)
-  currentLevel: -1,           // -1 = Otomatik (ABR)
-  errorMessage: null
+  status: 'idle', // 'idle' | 'loading' | 'playing' | 'paused' | 'buffering' | 'error'
+  currentTime: 0,
+  duration: 0,
+  buffered: 0,
+  volume: 1,
+  isMuted: false,
+  playbackRate: 1,
+  qualities: [],
+  currentQuality: -1, // -1 = Auto
+  errorMessage: null,
 };
 
 function playerReducer(state, action) {
   switch (action.type) {
-    case PLAYER_ACTIONS.SET_LOADING:
-      return { ...state, status: PLAYER_STATES.LOADING, errorMessage: null };
-    case PLAYER_ACTIONS.SET_PLAYING:
-      return { ...state, status: PLAYER_STATES.PLAYING, errorMessage: null };
-    case PLAYER_ACTIONS.SET_PAUSED:
-      return { ...state, status: PLAYER_STATES.PAUSED };
-    case PLAYER_ACTIONS.SET_BUFFERING:
-      return { ...state, status: PLAYER_STATES.BUFFERING };
-    case PLAYER_ACTIONS.SET_ERROR:
-      return { ...state, status: PLAYER_STATES.ERROR, errorMessage: action.payload };
-    case PLAYER_ACTIONS.SET_LEVELS:
-      return { ...state, levels: action.payload };
-    case PLAYER_ACTIONS.SET_CURRENT_LEVEL:
-      return { ...state, currentLevel: action.payload };
+    case 'SET_STATUS':
+      return { ...state, status: action.payload };
+    case 'SET_TIME':
+      return { 
+        ...state, 
+        currentTime: action.payload.currentTime, 
+        duration: action.payload.duration || state.duration 
+      };
+    case 'SET_BUFFERED':
+      return { ...state, buffered: action.payload };
+    case 'SET_VOLUME':
+      return { ...state, volume: action.payload, isMuted: action.payload === 0 };
+    case 'TOGGLE_MUTE':
+      return { ...state, isMuted: !state.isMuted };
+    case 'SET_SPEED':
+      return { ...state, playbackRate: action.payload };
+    case 'SET_QUALITIES':
+      return { ...state, qualities: action.payload };
+    case 'SET_CURRENT_QUALITY':
+      return { ...state, currentQuality: action.payload };
+    case 'SET_ERROR':
+      return { ...state, status: 'error', errorMessage: action.payload };
     default:
       return state;
   }
 }
 
-export const usePlayerState = () => {
-  const [state, dispatch] = useReducer(playerReducer, initialState);
-  return { state, dispatch };
-};
+export function usePlayerState() {
+  return useReducer(playerReducer, initialState);
+}
