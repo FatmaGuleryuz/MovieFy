@@ -1,0 +1,51 @@
+/* Kartları saran ana şeridin stili */
+.movie-row-cards {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important; /* Kartların asla alt satıra geçmesini engeller */
+  gap: 16px !important;
+  overflow-x: auto !important; /* Sağa doğru taşanları kaydırılabilir yapar */
+  overflow-y: hidden !important;
+  width: 100% !important;
+  padding: 10px 0 !important;
+  scroll-behavior: smooth;
+}
+
+/* Kartların büzüşmesini kesin olarak engelleyen kısım */
+.movie-row-card-wrapper {
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  width: 200px !important; /* Kartların ekranda durmasını istediğin ideal genişlik */
+  box-sizing: border-box;
+}
+
+/* Alttaki çirkin gri kaydırma çubuğunu gizlemek için */
+.movie-row-cards::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* Skeleton Kutu Boyutları (Senin film kartı ölçülerine uygun) */
+.skeleton-card {
+  min-width: 160px;
+  height: 240px;
+  border-radius: 8px;
+  background-color: #2a2a2a;
+  flex-shrink: 0;
+}
+
+/* Yavaşça Yanıp Sönme (Pulse) Animasyonu */
+.animate-pulse {
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0.3;
+  }
+}

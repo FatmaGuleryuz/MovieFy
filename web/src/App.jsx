@@ -1,122 +1,195 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState, useEffect } from 'react';
+import './App.css'; 
+import Navbar from './components/Navbar';
+import HeroBanner from './components/HeroBanner';
+import MovieRow from './components/MovieRow';
+import MovieModal from './components/MovieModal';
+import PersonModal from './components/PersonModal';
+import { 
+  getDailyTrending, 
+  getPopularMovies, 
+  getPopularTV,
+  getNowPlayingMovies,
+  getTopRatedMovies,
+  getMoviesByGenre,
+  getTVByGenre
+} from './api/movieService';
 
-function App() {
-  const [count, setCount] = useState(0)
+const App = () => {
+  const [heroMovie, setHeroMovie] = useState(null);
+  const [defaultHeroMovie, setDefaultHeroMovie] = useState(null);
+
+  const [trendingMovies, setTrendingMovies] = useState([]);
+  const [popularMovies, setPopularMovies] = useState([]);
+  const [popularTV, setPopularTV] = useState([]);
+  const [nowPlaying, setNowPlaying] = useState([]);
+  const [topRated, setTopRated] = useState([]);
+  
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  
+  const [selectedPersonId, setSelectedPersonId] = useState(null);
+  const [selectedMedia, setSelectedMedia] = useState(null);
+  
+  const [selectedGenre, setSelectedGenre] = useState(null);
+  const [genreMediaType, setGenreMediaType] = useState('movie');
+
+  const handleSelectGenre = async (genreId, type = 'movie') => {
+    setSelectedGenre(genreId);
+    setGenreMediaType(type);
+
+    if (genreId === null) {
+      setFilteredMovies([]);
+      setHeroMovie(defaultHeroMovie);
+    } else {
+      setLoading(true);
+      const results = type === 'tv' 
+        ? await getTVByGenre(genreId) 
+        : await getMoviesByGenre(genreId);
+
+      if (results && results.length > 0) {
+        setHeroMovie(results[0]);
+        setFilteredMovies(results.slice(1));
+      } else {
+        setFilteredMovies([]);
+      }
+      setLoading(false);
+    }
+  };
+
+  const [filteredMovies, setFilteredMovies] = useState([]);
+
+  const handleSelectMedia = (id, mediaType = 'movie') => {
+    setSelectedMedia({ id, mediaType });
+  };
+
+  useEffect(() => {
+    const fetchAllData = async () => {
+      try {
+        setLoading(true);
+        setError(false);
+
+        const [trendingData, nowPlayingData, topRatedData, popularData, tvData] = await Promise.all([
+          getDailyTrending(),
+          getNowPlayingMovies(),
+          getTopRatedMovies(),
+          getPopularMovies(),
+          getPopularTV()
+        ]);
+
+        const trendList = trendingData?.results || [];
+        const nowPlayingList = nowPlayingData?.results || [];
+        const popularList = popularData?.results || [];
+
+        setTrendingMovies(trendList);
+        setNowPlaying(nowPlayingList);
+        setTopRated(topRatedData?.results || []);
+        setPopularMovies(popularList);
+        setPopularTV(tvData?.results || []);
+
+        // ⚡ HERO BANNER GARANTİ SİSTEMİ:
+        // Trendler varsa ilkini al, yoksa Vizyondakiler'den, o da yoksa Popüler'den al!
+        const fallbackHero = trendList[0] || nowPlayingList[0] || popularList[0] || null;
+        setHeroMovie(fallbackHero);
+        setDefaultHeroMovie(fallbackHero);
+
+      } catch (e) {
+        console.error("Veriler çekilemedi:", e);
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAllData();
+  }, []);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="app" style={{ backgroundColor: '#000000', color: '#ffffff', minHeight: '100vh', width: '100%' }}>
+      {/* Navbar */}
+      <Navbar 
+        onSelectMedia={handleSelectMedia}
+        onSelectPerson={(id) => setSelectedPersonId(id)}
+        onSelectGenre={handleSelectGenre}
+      />
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+      {error ? (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '80vh',
+          textAlign: 'center'
+        }}>
+          <h2 style={{ fontSize: '1.8rem', color: '#e50914', marginBottom: '10px' }}>
+            Ters giden bir şeyler oldu 😕
+          </h2>
+          <button 
+            onClick={() => window.location.reload()}
+            style={{
+              padding: '10px 24px',
+              backgroundColor: '#e50914',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Tekrar Dene
+          </button>
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      ) : (
+        <>
+          {/* Garanti Hero Banner */}
+          {heroMovie && <HeroBanner movie={heroMovie} />}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
-}
+          <div className="main-container" style={{ marginTop: heroMovie ? '-60px' : '80px', position: 'relative', zIndex: '2', width: '100%', paddingLeft: '4%', boxSizing: 'border-box' }}>
+            
+            {selectedGenre !== null ? (
+              <MovieRow 
+                title={`Seçilen Türe Ait ${genreMediaType === 'tv' ? 'Diziler' : 'Filmler'}`}
+                movies={filteredMovies} 
+                isLoading={loading}
+                mediaType={genreMediaType}
+                onSelectMovie={handleSelectMedia}
+                onSelectMedia={handleSelectMedia}
+              />
+            ) : (
+              <>
+                {trendingMovies.length > 0 && (
+                  <MovieRow title="Günün Trendleri" movies={trendingMovies} isLoading={loading} onSelectMovie={handleSelectMedia} onSelectMedia={handleSelectMedia} />
+                )}
+                <MovieRow title="Vizyondakiler" movies={nowPlaying} isLoading={loading} mediaType="movie" onSelectMovie={handleSelectMedia} onSelectMedia={handleSelectMedia} />
+                <MovieRow title="En Yüksek Puanlılar" movies={topRated} isLoading={loading} mediaType="movie" onSelectMovie={handleSelectMedia} onSelectMedia={handleSelectMedia} />
+                <MovieRow title="Popüler Filmler" movies={popularMovies} isLoading={loading} mediaType="movie" onSelectMovie={handleSelectMedia} onSelectMedia={handleSelectMedia} />
+                <MovieRow title="Popüler Diziler" movies={popularTV} isLoading={loading} mediaType="tv" onSelectMovie={handleSelectMedia} onSelectMedia={handleSelectMedia} />
+              </>
+            )}
 
-export default App
+          </div>
+        </>
+      )}
+
+      {/* Modallar */}
+      {selectedMedia && (
+        <MovieModal 
+          movieId={selectedMedia.id} 
+          mediaType={selectedMedia.mediaType}
+          onClose={() => setSelectedMedia(null)} 
+          onSelectPerson={(personId) => setSelectedPersonId(personId)}
+        />
+      )}
+
+      {selectedPersonId && (
+        <PersonModal
+          personId={selectedPersonId}
+          onClose={() => setSelectedPersonId(null)}
+          onSelectMedia={(id, mediaType) => setSelectedMedia({ id, mediaType })} 
+        />
+      )}
+    </div>
+  );
+};
+
+export default App;

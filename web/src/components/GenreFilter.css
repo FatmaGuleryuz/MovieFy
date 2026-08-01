@@ -1,0 +1,48 @@
+/* Filtre Barı Kapsayıcısı */
+.genre-filter-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 14px 24px;
+  margin: 10px 0 25px 0;
+  background: rgba(24, 24, 27, 0.6); /* Hafif şeffaf koyu zemin */
+  backdrop-filter: blur(12px); /* Arkadaki görseli tatlıca bulanıklaştırır */
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  scrollbar-width: none;
+}
+
+.genre-filter-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* Buton Tasarımları */
+.genre-chip {
+  background: rgba(255, 255, 255, 0.05);
+  color: #a1a1aa;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 18px;
+  border-radius: 30px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.genre-chip:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+/* Seçili Buton (Logomuzun Mor Tonlarında) */
+.genre-chip.active {
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  color: #ffffff;
+  border-color: transparent;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.35);
+}
