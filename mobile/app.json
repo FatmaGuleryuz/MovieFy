@@ -1,5 +1,18 @@
 {
-  "plugins": [
-    "expo-video"
-  ]
+  "expo": {
+    "name": "Moviefy",
+    "slug": "moviefy",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-video"
+    ]
+  }
 }

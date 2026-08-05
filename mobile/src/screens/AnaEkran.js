@@ -10,6 +10,7 @@ import {
   Dimensions,
   Animated,
   Easing,
+  Modal,
 } from 'react-native';
 import { useMovieData } from '../hooks/useMovieData';
 import { MovieSlider } from '../components/FilmSlider';
@@ -19,11 +20,13 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getImageUrl } from '../api/config';
 import { Ionicons } from '@expo/vector-icons';
+import { useMultiFavorites } from '../hooks/useMultiFavorites';
+import { movieService } from '../api/services';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_HEIGHT * 0.76;
 
-export default function AnaEkran({ navigation }) {
+export default function AnaEkran({ navigation, route }) {
   const {
     trending,
     popularMovies,
@@ -41,10 +44,20 @@ export default function AnaEkran({ navigation }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [splashVisible, setSplashVisible] = useState(true);
 
-  // GİRDAP (VORTEX) ANİMASYON DEĞERLERİ
+  // LİSTE VE OYNATMA STATE'LERİ
+  const { listNames, toggleMovieInList, getListsContainingMovie } = useMultiFavorites();
+  const [selectedMovieForList, setSelectedMovieForList] = useState(null);
+  const [showListModal, setShowListModal] = useState(false);
+  const [loadingPlayId, setLoadingPlayId] = useState(null);
+
+  // GİRDAP & GEÇİŞ ANİMASYONLARI
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
+  const contentFadeAnim = useRef(new Animated.Value(0)).current;
+
+  // KAYDIRMA HAREKETİ İLE TAB BAR GİZLEME/GÖSTERME REFERANSI
+  const lastOffsetY = useRef(0);
 
   useEffect(() => {
     if (!loading) {
@@ -52,25 +65,33 @@ export default function AnaEkran({ navigation }) {
         Animated.parallel([
           Animated.timing(fadeAnim, {
             toValue: 0,
-            duration: 750,
+            duration: 900,
             useNativeDriver: true,
           }),
           Animated.timing(scaleAnim, {
             toValue: 0,
-            duration: 750,
-            easing: Easing.back(1.5),
+            duration: 900,
+            easing: Easing.back(1.8),
             useNativeDriver: true,
           }),
           Animated.timing(rotateAnim, {
             toValue: 1,
-            duration: 750,
-            easing: Easing.ease,
+            duration: 900,
+            easing: Easing.bezier(0.42, 0, 0.58, 1),
+            useNativeDriver: true,
+          }),
+          Animated.timing(contentFadeAnim, {
+            toValue: 1,
+            duration: 800,
             useNativeDriver: true,
           }),
         ]).start(() => {
           setSplashVisible(false);
+          if (route?.params?.onSplashFinish) {
+            route.params.onSplashFinish();
+          }
         });
-      }, 1200);
+      }, 1000);
 
       return () => clearTimeout(timer);
     }
@@ -78,7 +99,7 @@ export default function AnaEkran({ navigation }) {
 
   const spin = rotateAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
+    outputRange: ['0deg', '1080deg'],
   });
 
   const handleScroll = (event) => {
@@ -86,6 +107,96 @@ export default function AnaEkran({ navigation }) {
     const index = Math.round(event.nativeEvent.contentOffset.x / slideSize);
     if (index !== activeIndex) {
       setActiveIndex(index);
+    }
+  };
+
+  // 🌟 DİKEY SCROLL TAKİBİ (AŞAĞI KAYDIRINCA GİZLE, YUKARI KAYDIRINCA GÖSTER)
+  const handleVerticalScroll = (event) => {
+    const currentOffsetY = event.nativeEvent.contentOffset.y;
+    const diff = currentOffsetY - lastOffsetY.current;
+
+    if (Math.abs(diff) > 6) {
+      if (diff > 0 && currentOffsetY > 120) {
+        // Aşağı kaydırılıyor -> Tab Bar'ı gizle
+        navigation.setOptions({ tabBarStyle: { display: 'none' } });
+      } else if (diff < 0) {
+        // Yukarı kaydırılıyor -> Tab Bar'ı yarı şeffaf gri renkle göster
+        navigation.setOptions({
+          tabBarStyle: {
+            backgroundColor: 'rgba(28, 28, 30, 0.92)',
+            borderTopWidth: 1,
+            borderTopColor: 'rgba(255, 255, 255, 0.08)',
+            height: 60,
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            elevation: 0,
+            shadowOpacity: 0,
+            display: 'flex',
+          },
+        });
+      }
+    }
+    lastOffsetY.current = currentOffsetY;
+  };
+
+  const handleHeartPress = (item) => {
+    setSelectedMovieForList(item);
+    setShowListModal(true);
+  };
+
+  const handleToggleList = (listName) => {
+    if (selectedMovieForList) {
+      const isTv = selectedMovieForList.media_type === 'tv' || selectedMovieForList.first_air_date;
+      toggleMovieInList(listName, {
+        id: selectedMovieForList.id,
+        title: selectedMovieForList.title || selectedMovieForList.name,
+        poster_path: selectedMovieForList.poster_path,
+        vote_average: selectedMovieForList.vote_average,
+        overview: selectedMovieForList.overview,
+        release_date: selectedMovieForList.release_date || selectedMovieForList.first_air_date || '',
+        media_type: isTv ? 'tv' : 'movie',
+      });
+    }
+  };
+
+  const handlePlayPress = async (item) => {
+    if (!item) return;
+    
+    const isTv = item.media_type === 'tv' || !!item.first_air_date || !!item.name;
+    const title = item.title || item.name || 'İçerik';
+
+    if (isTv) {
+      try {
+        setLoadingPlayId(item.id);
+        const seasonData = await movieService.getSeasonDetails(item.id, 1).catch(() => null);
+        const firstEpisodeName = seasonData?.episodes?.[0]?.name;
+        
+        const displayTitle = firstEpisodeName 
+          ? `${title} - 1.Sezon 1.Bölüm (${firstEpisodeName})`
+          : `${title} - 1.Sezon 1.Bölüm`;
+
+        navigation.navigate('Player', {
+          id: item.id,
+          title: displayTitle,
+          media_type: 'tv',
+        });
+      } catch (err) {
+        navigation.navigate('Player', {
+          id: item.id,
+          title: `${title} - 1.Sezon 1.Bölüm`,
+          media_type: 'tv',
+        });
+      } finally {
+        setLoadingPlayId(null);
+      }
+    } else {
+      navigation.navigate('Player', {
+        id: item.id,
+        title: title,
+        media_type: 'movie',
+      });
     }
   };
 
@@ -100,11 +211,15 @@ export default function AnaEkran({ navigation }) {
 
   const heroItems = trending ? trending.slice(0, 6) : [];
 
+  const containingLists = selectedMovieForList
+    ? getListsContainingMovie(selectedMovieForList.id)
+    : [];
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="light" />
 
-      {/* 🌪️ 1. NUMARALI ÇİZİME UYGUN SPLASH EKRANI 🌪️ */}
+      {/* GİRDAP EFEKTLİ SPLASH EKRANI */}
       {splashVisible && (
         <View style={styles.splashContainer}>
           <Animated.View
@@ -119,127 +234,184 @@ export default function AnaEkran({ navigation }) {
               },
             ]}
           >
-            {/* 1 NUMARALI ÇİZİM LOGO DİZİLİMİ */}
             <View style={styles.logoWrapper}>
               <Text style={styles.logoMovieText}>MOVIE</Text>
               
-              {/* FY BİRBİRİNE YAKIN VE DEVASA */}
               <View style={styles.fyContainer}>
                 <Text style={styles.logoFyText}>FY</Text>
               </View>
             </View>
 
-            <ActivityIndicator size="large" color="#7709e5" style={{ marginTop: 24 }} />
+            <ActivityIndicator size="large" color="#7709e5" style={{ marginTop: 28 }} />
           </Animated.View>
         </View>
       )}
 
-      {/* 🎬 ANA EKRAN İÇERİĞİ */}
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        style={styles.scrollView}
-      >
-        {/* HERO CAROUSEL */}
-        {heroItems.length > 0 && (
-          <View style={styles.heroContainer}>
-            <View style={styles.headerLogoWrapper}>
-              <Text style={styles.headerTitle}>Moviefy</Text>
-            </View>
+      {/* YUMUŞAK GEÇİŞLİ ANA EKRAN İÇERİĞİ */}
+      <Animated.View style={[{ flex: 1, opacity: contentFadeAnim }]}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          style={styles.scrollView}
+          onScroll={handleVerticalScroll}
+          scrollEventThrottle={16}
+        >
+          {/* HERO CAROUSEL */}
+          {heroItems.length > 0 && (
+            <View style={styles.heroContainer}>
+              <View style={styles.headerLogoWrapper}>
+                <Text style={styles.headerTitle}>MovieFy</Text>
+              </View>
 
-            <FlatList
-              data={heroItems}
-              keyExtractor={(item) => item.id.toString()}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onScroll={handleScroll}
-              scrollEventThrottle={16}
-              renderItem={({ item }) => {
-                const title = item.title || item.name;
-                const rating = item.vote_average ? item.vote_average.toFixed(1) : 'N/A';
-                const releaseYear = (item.release_date || item.first_air_date || '').substring(0, 4);
+              <FlatList
+                data={heroItems}
+                keyExtractor={(item) => item.id.toString()}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+                renderItem={({ item }) => {
+                  const title = item.title || item.name;
+                  const rating = item.vote_average ? item.vote_average.toFixed(1) : 'N/A';
+                  const releaseYear = (item.release_date || item.first_air_date || '').substring(0, 4);
+
+                  const isItemInFav = getListsContainingMovie(item.id).length > 0;
+
+                  return (
+                    <Pressable
+                      style={styles.heroCard}
+                      onPress={() =>
+                        navigation.navigate('Detay', { id: item.id, type: item.media_type || 'movie' })
+                      }
+                    >
+                      <Image
+                        source={{ uri: getImageUrl(item.backdrop_path || item.poster_path, 'original') }}
+                        style={styles.heroImage}
+                        contentFit="cover"
+                      />
+
+                      <LinearGradient
+                        colors={['rgba(14,14,14,0.85)', 'transparent', 'rgba(20,20,20,0.6)', '#141414']}
+                        locations={[0, 0.2, 0.7, 1]}
+                        style={styles.heroGradient}
+                      >
+                        <View style={styles.heroContent}>
+                          <Text style={styles.heroTitle} numberOfLines={2}>
+                            {title}
+                          </Text>
+
+                          <View style={styles.heroMetaRow}>
+                            <Text style={styles.heroMetaText}>⭐ {rating}</Text>
+                            {releaseYear ? <Text style={styles.heroMetaText}>• {releaseYear}</Text> : null}
+                            <Text style={styles.heroMetaText}>• Öne Çıkan</Text>
+                          </View>
+
+                          {/* HERO BUTONLARI */}
+                          <View style={styles.heroButtonsRow}>
+                            <Pressable
+                              style={styles.iconOnlyButton}
+                              onPress={() => handlePlayPress(item)}
+                            >
+                              {loadingPlayId === item.id ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                              ) : (
+                                <Ionicons name="play" size={28} color="#fff" />
+                              )}
+                            </Pressable>
+
+                            <Pressable 
+                              style={styles.iconOnlyButton}
+                              onPress={() => handleHeartPress(item)}
+                            >
+                              <Ionicons
+                                name={isItemInFav ? 'heart' : 'heart-outline'}
+                                size={28}
+                                color={isItemInFav ? '#7709e5' : '#fff'}
+                              />
+                            </Pressable>
+                          </View>
+                        </View>
+                      </LinearGradient>
+                    </Pressable>
+                  );
+                }}
+              />
+
+              <View style={styles.paginationContainer}>
+                {heroItems.map((_, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.paginationDot,
+                      activeIndex === index && styles.activePaginationDot,
+                    ]}
+                  />
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* KATEGORİ SLIDER'LARI */}
+          <View style={styles.slidersWrapper}>
+            <MovieSlider title="Günün Trendleri" data={trending} />
+            <MovieSlider title="Popüler Filmler" data={popularMovies} />
+            <MovieSlider title="Trend Diziler" data={popularTV} />
+            <MovieSlider title="Sizin İçin Önerilenler" data={recommended} />
+            <MovieSlider title="Christopher Nolan İmzalı" data={nolanMovies} />
+            <MovieSlider title="Vizyondakiler" data={nowPlaying} />
+            <MovieSlider title="Animasyon" data={animationMovies} />
+            <MovieSlider title="Korku Severler İçin" data={horrorMovies} />
+            <MovieSlider title="En Yüksek Puan Alanlar" data={topRated} />
+          </View>
+        </ScrollView>
+      </Animated.View>
+
+      {/* HERO SLIDER İÇİN LİSTE SEÇİM MODALI */}
+      <Modal
+        visible={showListModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowListModal(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setShowListModal(false)}>
+          <View style={styles.listSheetContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.listSheetTitle}>Listelerime Ekle / Çıkar</Text>
+            <Text style={styles.listSheetSubTitle}>
+              {selectedMovieForList?.title || selectedMovieForList?.name}
+            </Text>
+
+            <ScrollView style={{ maxHeight: 250, marginVertical: 10 }}>
+              {listNames.map((name) => {
+                const inThisList = containingLists.includes(name);
 
                 return (
                   <Pressable
-                    style={styles.heroCard}
-                    onPress={() =>
-                      navigation.navigate('Detay', { id: item.id, type: item.media_type || 'movie' })
-                    }
+                    key={name}
+                    style={[styles.listSelectOption, inThisList && styles.activeListSelectOption]}
+                    onPress={() => handleToggleList(name)}
                   >
-                    <Image
-                      source={{ uri: getImageUrl(item.backdrop_path || item.poster_path, 'original') }}
-                      style={styles.heroImage}
-                      contentFit="cover"
+                    <Text style={[styles.listOptionText, inThisList && styles.activeListOptionText]}>
+                      {name}
+                    </Text>
+
+                    <Ionicons
+                      name={inThisList ? 'checkmark-circle' : 'add-circle-outline'}
+                      size={22}
+                      color={inThisList ? '#7709e5' : '#777'}
                     />
-
-                    <LinearGradient
-                      colors={['rgba(14,14,14,0.85)', 'transparent', 'rgba(20,20,20,0.6)', '#141414']}
-                      locations={[0, 0.2, 0.7, 1]}
-                      style={styles.heroGradient}
-                    >
-                      <View style={styles.heroContent}>
-                        <Text style={styles.heroTitle} numberOfLines={2}>
-                          {title}
-                        </Text>
-
-                        <View style={styles.heroMetaRow}>
-                          <Text style={styles.heroMetaText}>{rating}</Text>
-                          {releaseYear ? <Text style={styles.heroMetaText}>• {releaseYear}</Text> : null}
-                          <Text style={styles.heroMetaText}>• Öne Çıkan</Text>
-                        </View>
-
-                        <View style={styles.heroButtonsRow}>
-                          <Pressable
-                            style={styles.iconOnlyButton}
-                            onPress={() =>
-                              navigation.navigate('Player', {
-                                title: title,
-                                id: item.id,
-                              })
-                            }
-                          >
-                            <Ionicons name="play" size={28} color="#fff" />
-                          </Pressable>
-
-                          <Pressable style={styles.iconOnlyButton}>
-                            <Ionicons name="add" size={32} color="#fff" />
-                          </Pressable>
-                        </View>
-                      </View>
-                    </LinearGradient>
                   </Pressable>
                 );
-              }}
-            />
+              })}
+            </ScrollView>
 
-            <View style={styles.paginationContainer}>
-              {heroItems.map((_, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.paginationDot,
-                    activeIndex === index && styles.activePaginationDot,
-                  ]}
-                />
-              ))}
-            </View>
+            <Pressable style={styles.doneButton} onPress={() => setShowListModal(false)}>
+              <Text style={styles.doneButtonText}>Tamam</Text>
+            </Pressable>
           </View>
-        )}
-
-        {/* KATEGORİ SLIDER'LARI */}
-        <View style={styles.slidersWrapper}>
-          <MovieSlider title="Günün Trendleri" data={trending} />
-          <MovieSlider title="Popüler Filmler" data={popularMovies} />
-          <MovieSlider title="Trend Diziler" data={popularTV} />
-          <MovieSlider title="Sizin İçin Önerilenler" data={recommended} />
-          <MovieSlider title="Christopher Nolan İmzalı" data={nolanMovies} />
-          <MovieSlider title="Vizyondakiler" data={nowPlaying} />
-          <MovieSlider title="Animasyon" data={animationMovies} />
-          <MovieSlider title="Korku Severler İçin" data={horrorMovies} />
-          <MovieSlider title="En Yüksek Puan Alanlar" data={topRated} />
-        </View>
-      </ScrollView>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -257,7 +429,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-
   splashContainer: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#141414',
@@ -274,26 +445,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoMovieText: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: '900',
     color: '#ffffff',
-    letterSpacing: 3,
+    letterSpacing: 2,
     textAlign: 'center',
   },
-  
-  // 🌟 1 NUMARALI ÇİZİMDEKİ GİBİ: BİRBİRİNE YAKIN, ORTASI BOŞ OLMAYAN VE DEVASA FY 🌟
   fyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -10, // MOVIE kelimesinin hemen altına yapıştırır
+    marginTop: -18,
+    transform: [{ scaleX: 1.4 }],
   },
   logoFyText: {
-    fontSize: 64, // Dev boyutta F ve Y harfi
+    fontSize: 54,
     fontWeight: '900',
     color: '#7709e5',
-    letterSpacing: -2, // Harflerin arasını kapatıp birbirine yaklaştırır
+    letterSpacing: -3,
   },
-
   headerLogoWrapper: {
     position: 'absolute',
     top: 12,
@@ -362,7 +531,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   iconOnlyButton: {
-    padding: 4,
+    padding: 6,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -396,5 +565,75 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 14,
     textAlign: 'center',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'flex-end',
+  },
+  listSheetContent: {
+    width: '100%',
+    backgroundColor: '#1c1c1e',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: '#444',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  listSheetTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  listSheetSubTitle: {
+    color: '#888',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  listSelectOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#252527',
+    borderRadius: 10,
+    marginBottom: 8,
+  },
+  activeListSelectOption: {
+    backgroundColor: 'rgba(119, 9, 229, 0.18)',
+    borderWidth: 1,
+    borderColor: '#7709e5',
+  },
+  listOptionText: {
+    color: '#ccc',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  activeListOptionText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  doneButton: {
+    backgroundColor: '#7709e5',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  doneButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 15,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -37,6 +37,9 @@ export default function KesfetEkrani({ navigation }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+
+  // 🌟 KAYDIRMA HAREKETİ İLE TAB BAR GİZLEME/GÖSTERME REFERANSI
+  const lastOffsetY = useRef(0);
 
   // Türleri Yükle
   useEffect(() => {
@@ -79,6 +82,33 @@ export default function KesfetEkrani({ navigation }) {
 
     fetchFilteredMovies();
   }, [selectedGenre, selectedYear, selectedSort]);
+
+  // 🌟 DİKEY SCROLL TAKİBİ (AŞAĞI KAYDIRINCA GİZLE, YUKARI KAYDIRINCA GÖSTER)
+  const handleScroll = (event) => {
+    const currentOffsetY = event.nativeEvent.contentOffset.y;
+    const diff = currentOffsetY - lastOffsetY.current;
+
+    if (Math.abs(diff) > 6) {
+      if (diff > 0 && currentOffsetY > 120) {
+        // Aşağı kaydırılıyor -> Tab Bar'ı gizle
+        navigation.setOptions({ tabBarStyle: { display: 'none' } });
+      } else if (diff < 0) {
+        // Yukarı kaydırılıyor -> Tab Bar'ı göster
+        navigation.setOptions({
+          tabBarStyle: {
+            backgroundColor: '#1f1f1f',
+            borderTopWidth: 1,
+            borderTopColor: '#2a2a2a',
+            height: 60,
+            elevation: 0,
+            shadowOpacity: 0,
+            display: 'flex',
+          },
+        });
+      }
+    }
+    lastOffsetY.current = currentOffsetY;
+  };
 
   // Sonsuz Kaydırma (Infinite Scroll)
   const loadMoreMovies = async () => {
@@ -211,6 +241,8 @@ export default function KesfetEkrani({ navigation }) {
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={renderHeader}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           onEndReached={loadMoreMovies}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
@@ -355,7 +387,6 @@ const styles = StyleSheet.create({
   activeBadgeText: {
     color: '#fff',
   },
-  // DROPDOWN BUTON STİLLERİ
   dropdownRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -486,4 +517,3 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
-

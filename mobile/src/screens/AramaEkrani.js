@@ -8,12 +8,15 @@ import {
   ActivityIndicator,
   Pressable,
   ScrollView,
+  BackHandler,
+  Keyboard,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { movieService } from '../api/services';
 import { getImageUrl } from '../api/config';
+import { historyStorage } from '../utils/historyStorage';
 
 export default function AramaEkrani({ navigation }) {
   const [query, setQuery] = useState('');
@@ -23,30 +26,71 @@ export default function AramaEkrani({ navigation }) {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  // Arama Input Fokus Durumu
+  const [isInputFocused, setIsInputFocused] = useState(false);
+
+  // Son Aramalar Geçmişi
+  const [searchHistory, setSearchHistory] = useState([]);
+
   // Arama Boşken Gösterilecek Öneriler
   const [suggestions, setSuggestions] = useState({ recommended: [], popularTV: [] });
   const [suggestionsLoading, setSuggestionsLoading] = useState(true);
 
+  const inputRef = useRef(null);
   const abortControllerRef = useRef(null);
 
-  // 1. Arama Ekranı İlk Açıldığında Önerileri Çek
+  // 1. Önerileri ve Arama Geçmişini Yükle
   useEffect(() => {
-    const fetchSuggestions = async () => {
+    const fetchSuggestionsAndHistory = async () => {
       try {
         setSuggestionsLoading(true);
-        const data = await movieService.getSearchSuggestions();
-        setSuggestions(data);
+        const [data, history] = await Promise.all([
+          movieService.getSearchSuggestions(),
+          historyStorage.getSearchHistory(),
+        ]);
+        setSuggestions(data || { recommended: [], popularTV: [] });
+        setSearchHistory(history || []);
       } catch (err) {
-        console.error('Öneriler çekilirken hata:', err);
+        console.error('Veriler çekilirken hata:', err);
       } finally {
         setSuggestionsLoading(false);
       }
     };
 
-    fetchSuggestions();
+    fetchSuggestionsAndHistory();
   }, []);
 
-  // 2. Arama İşlemi (400ms Debounce & AbortController)
+  // 2. Android & Cihaz Geri Tuşu Mantığı
+  useEffect(() => {
+    const onBackPress = () => {
+      // 1. Durum: Arama kutusunda metin var veya arama sonuçları gösteriliyorsa
+      if (query.trim().length > 0) {
+        Keyboard.dismiss();
+        setQuery('');
+        setResults([]);
+        setIsInputFocused(false);
+        if (inputRef.current) inputRef.current.blur();
+        return true; // Geri gitme işlemini engelle, arama ekranı ana haline dönsün
+      }
+
+      // 2. Durum: Klavye açık veya arama barı odağındaysa (Son aramalar görünüyorsa)
+      if (isInputFocused) {
+        Keyboard.dismiss();
+        setIsInputFocused(false);
+        if (inputRef.current) inputRef.current.blur();
+        return true; // Geri gitme işlemini engelle, varsayılan önerilere dönsün
+      }
+
+      // 3. Durum: Ekran zaten en temiz halinde ise standart geri gitme yap
+      return false;
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+    return () => backHandler.remove();
+  }, [query, isInputFocused]);
+
+  // 3. Arama İşlemi (400ms Debounce & AbortController)
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
@@ -75,9 +119,15 @@ export default function AramaEkrani({ navigation }) {
           setResults(filtered);
           setPage(1);
           setTotalPages(data.total_pages);
+
+          // Başarılı aramayı geçmişe ekle
+          const updatedHistory = await historyStorage.addSearchQuery(query.trim());
+          if (updatedHistory) setSearchHistory(updatedHistory);
         }
       } catch (err) {
-        console.error('Arama hatası:', err);
+        if (err.name !== 'AbortError') {
+          console.error('Arama hatası:', err);
+        }
       } finally {
         setLoading(false);
       }
@@ -109,13 +159,35 @@ export default function AramaEkrani({ navigation }) {
     }
   };
 
-  const handleItemPress = (item, defaultType = 'movie') => {
+  const handleItemPress = async (item, defaultType = 'movie') => {
     const mediaType = item.media_type || defaultType;
+    await historyStorage.addWatchHistory(item);
+
     if (mediaType === 'person') {
       navigation.push('Oyuncu', { personId: item.id });
     } else {
       navigation.push('Detay', { id: item.id, type: mediaType });
     }
+  };
+
+  // Arama Temizleme Butonuna Basıldığında
+  const handleClearQuery = () => {
+    setQuery('');
+    setResults([]);
+    setIsInputFocused(false);
+    Keyboard.dismiss();
+    if (inputRef.current) inputRef.current.blur();
+  };
+
+  // Geçmiş Arama Silme İşlemleri
+  const handleRemoveHistoryItem = async (itemToRemove) => {
+    const updated = await historyStorage.removeSearchQuery(itemToRemove);
+    setSearchHistory(updated || []);
+  };
+
+  const handleClearAllHistory = async () => {
+    await historyStorage.clearSearchHistory();
+    setSearchHistory([]);
   };
 
   // Arama Sonucu Kartı
@@ -169,15 +241,18 @@ export default function AramaEkrani({ navigation }) {
       <View style={styles.searchBar}>
         <Ionicons name="search" size={20} color="#7709e5" style={styles.searchIcon} />
         <TextInput
+          ref={inputRef}
           style={styles.input}
           placeholder="Film, dizi veya oyuncu ara..."
           placeholderTextColor="#777"
           value={query}
           onChangeText={setQuery}
+          onFocus={() => setIsInputFocused(true)}
+          onBlur={() => setIsInputFocused(false)}
           autoCorrect={false}
         />
         {query.length > 0 && (
-          <Pressable onPress={() => setQuery('')}>
+          <Pressable onPress={handleClearQuery}>
             <Ionicons name="close-circle" size={20} color="#777" />
           </Pressable>
         )}
@@ -212,25 +287,54 @@ export default function AramaEkrani({ navigation }) {
           />
         )
       ) : (
-        /* DURUM 2: ARAMA KUTUSU BOŞKEN ÖNERİLER (SİZİN İÇİN ÖNERİLENLER VE EN POPÜLER DİZİLER) */
+        /* DURUM 2: ARAMA KUTUSU BOŞKEN */
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.suggestionsContainer}>
+          {/* SADECE ARAMA BARI TIKLANDIĞINDA/FOKUSLUYKEN GÖSTERİLEN SON ARAMALAR */}
+          {isInputFocused && searchHistory.length > 0 && (
+            <View style={styles.historySection}>
+              <View style={styles.historyHeader}>
+                <View style={{ flex: 1 }} />
+                <Pressable onPress={handleClearAllHistory}>
+                  <Text style={styles.clearText}>Temizle</Text>
+                </Pressable>
+              </View>
+              {searchHistory.map((historyItem, idx) => (
+                <View key={idx} style={styles.historyRow}>
+                  <Pressable
+                    style={styles.historyTextPress}
+                    onPress={() => setQuery(historyItem)}
+                  >
+                    <Ionicons name="time-outline" size={18} color="#777" style={{ marginRight: 10 }} />
+                    <Text style={styles.historyText}>{historyItem}</Text>
+                  </Pressable>
+                  <Pressable
+                    style={{ padding: 4 }}
+                    onPress={() => handleRemoveHistoryItem(historyItem)}
+                  >
+                    <Ionicons name="close" size={18} color="#666" />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          )}
+
           {suggestionsLoading ? (
             <ActivityIndicator size="large" color="#7709e5" style={{ marginTop: 40 }} />
           ) : (
             <>
               {/* SİZİN İÇİN ÖNERİLENLER */}
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}> Sizin İçin Önerilenler</Text>
+                <Text style={styles.sectionTitle}>Sizin İçin Önerilenler</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {suggestions.recommended.map((item) => renderHorizontalCard(item, 'movie'))}
+                  {suggestions.recommended?.map((item) => renderHorizontalCard(item, 'movie'))}
                 </ScrollView>
               </View>
 
               {/* EN POPÜLER DİZİLER */}
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}> En Popüler Diziler</Text>
+                <Text style={styles.sectionTitle}>En Popüler Diziler</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {suggestions.popularTV.map((item) => renderHorizontalCard(item, 'tv'))}
+                  {suggestions.popularTV?.map((item) => renderHorizontalCard(item, 'tv'))}
                 </ScrollView>
               </View>
             </>
@@ -320,9 +424,40 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: 'center',
   },
-  // VARSAYILAN ÖNERİ SLIDER STİLLERİ
   suggestionsContainer: {
     paddingBottom: 30,
+  },
+  historySection: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  clearText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+  },
+  historyTextPress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  historyText: {
+    color: '#ccc',
+    fontSize: 14,
   },
   section: {
     marginTop: 10,

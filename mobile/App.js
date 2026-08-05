@@ -1,36 +1,46 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Pressable } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import PlayerEkran from './src/screens/PlayerEkrani';
+import { StatusBar } from 'expo-status-bar';
 
 import AnaEkran from './src/screens/AnaEkran';
-import KesfetEkran from './src/screens/KesfetEkrani'; // Keşfet ekranı eklendi
+import KesfetEkran from './src/screens/KesfetEkrani'; 
 import AramaEkran from './src/screens/AramaEkrani';
 import DetayEkran from './src/screens/DetayEkrani';
-import KaydedilenlerEkran from './src/screens/Kaydedilenler'; 
+import KaydedilenlerEkran from './src/screens/ListemEkrani'; 
 import OyuncuEkran from './src/screens/OyuncuEkrani';
+import PlayerEkrani from './src/screens/PlayerEkrani';
 
 const Yigin = createNativeStackNavigator();
 const Sekme = createBottomTabNavigator();
 
-function SekmeNavigasyonu() {
+function SekmeNavigasyonu({ isSplashFinished, setIsSplashFinished }) {
   return (
     <Sekme.Navigator
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
         tabBarStyle: {
-          backgroundColor: '#141414',
-          borderTopWidth: 0,
+          backgroundColor: '#1f1f1f',
+          borderTopWidth: 1,
+          borderTopColor: '#2a2a2a',
           height: 60,
-          elevation: 0, // Tab bar altındaki gölge sıfırlandı
+          elevation: 0,
           shadowOpacity: 0,
+          justifyContent: 'center',
+          alignItems: 'center',
+          display: isSplashFinished ? 'flex' : 'none',
         },
-        tabBarButton: ({ children, ref, ...props }) => (
+        tabBarItemStyle: {
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100%',
+        },
+        tabBarButton: ({ children, ...props }) => (
           <Pressable
             {...props}
             style={({ pressed }) => [
@@ -44,10 +54,10 @@ function SekmeNavigasyonu() {
         ),
       }}
     >
-      {/* 1. Ana Sayfa */}
       <Sekme.Screen
         name="Ana Sayfa"
         component={AnaEkran}
+        initialParams={{ onSplashFinish: () => setIsSplashFinished(true) }}
         options={{
           tabBarIcon: ({ focused }) => (
             <Ionicons
@@ -60,7 +70,6 @@ function SekmeNavigasyonu() {
         }}
       />
 
-      {/* 2. Keşfet (YENİ) */}
       <Sekme.Screen
         name="Keşfet"
         component={KesfetEkran}
@@ -76,7 +85,6 @@ function SekmeNavigasyonu() {
         }}
       />
 
-      {/* 3. Arama */}
       <Sekme.Screen
         name="Ara"
         component={AramaEkran}
@@ -92,7 +100,6 @@ function SekmeNavigasyonu() {
         }}
       />
       
-      {/* 4. Kaydedilenler */}
       <Sekme.Screen
         name="Kaydedilenler"
         component={KaydedilenlerEkran}
@@ -112,31 +119,26 @@ function SekmeNavigasyonu() {
 }
 
 export default function App() {
+  const [isSplashFinished, setIsSplashFinished] = useState(false);
+
   return (
     <SafeAreaProvider style={{ backgroundColor: '#141414' }}>
+      <StatusBar style="light" />
       <SafeAreaView style={{ flex: 1, backgroundColor: '#141414' }} edges={['bottom']}>
         <NavigationContainer>
-          <Yigin.Navigator>
-            <Yigin.Screen
-              name="KokDizin"
-              component={SekmeNavigasyonu}
-              options={{ headerShown: false }}
-            />
-            <Yigin.Screen
-              name="Detay"
-              component={DetayEkran}
-              options={{ headerShown: false }}
-            />
-            <Yigin.Screen
-              name="Oyuncu"
-              component={OyuncuEkran}
-              options={{ headerShown: false }}
-            />
-            <Yigin.Screen
-              name="Player"
-              component={PlayerEkran}
-              options={{ headerShown: false }}
-/>
+          <Yigin.Navigator screenOptions={{ headerShown: false }}>
+            <Yigin.Screen name="KokDizin">
+              {(props) => (
+                <SekmeNavigasyonu
+                  {...props}
+                  isSplashFinished={isSplashFinished}
+                  setIsSplashFinished={setIsSplashFinished}
+                />
+              )}
+            </Yigin.Screen>
+            <Yigin.Screen name="Detay" component={DetayEkran} />
+            <Yigin.Screen name="Oyuncu" component={OyuncuEkran} />
+            <Yigin.Screen name="Player" component={PlayerEkrani} />
           </Yigin.Navigator>
         </NavigationContainer>
       </SafeAreaView>
@@ -149,6 +151,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    height: '100%',
   },
   tabButtonPressed: {
     opacity: 0.5,

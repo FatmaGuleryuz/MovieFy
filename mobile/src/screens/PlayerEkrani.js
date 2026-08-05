@@ -18,6 +18,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useIsFocused } from '@react-navigation/native';
 import * as NavigationBar from 'expo-navigation-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Slider from '@react-native-community/slider';
 
 const DEFAULT_HLS_URL =
   'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
@@ -35,7 +36,7 @@ const SUBTITLE_OPTIONS = ['Kapalı', 'Türkçe', 'İngilizce'];
 
 export default function PlayerEkrani({ route, navigation }) {
   const videoSource = route.params?.videoUrl || DEFAULT_HLS_URL;
-  const contentId = route.params?.id || 'default_video'; // Kayıt için benzersiz ID
+  const contentId = route.params?.id || 'default_video';
   const isFocused = useIsFocused();
 
   const [isPlaying, setIsPlaying] = useState(true);
@@ -45,19 +46,24 @@ export default function PlayerEkrani({ route, navigation }) {
   const [buffered, setBuffered] = useState(0);
   const [isBuffering, setIsBuffering] = useState(false);
 
-  // Hata Yakalama Durumu
+  // Hata Yakalama
   const [hasError, setHasError] = useState(false);
 
-  // Bottom Sheet Modal Durumları
+  // Sürükleme (Sliding) Durumu ve Anlık Süre Baloncuğu
+  const [isSliding, setIsSliding] = useState(false);
+  const [slidingTime, setSlidingTime] = useState(0);
+
+  // Modal Durumları
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [activeTab, setActiveTab] = useState('main');
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
   const [selectedQuality, setSelectedQuality] = useState('Otomatik (ABR)');
   const [selectedSubtitle, setSelectedSubtitle] = useState('Kapalı');
 
-  const [seekFeedback, setSeekFeedback] = useState(null);
+  const [seekSide, setSeekSide] = useState(null);
 
   const controlsTimeoutRef = useRef(null);
+  const seekTimeoutRef = useRef(null);
   const lastTapRef = useRef({ time: 0, side: null });
   const isPositionRestored = useRef(false);
 
@@ -67,7 +73,7 @@ export default function PlayerEkrani({ route, navigation }) {
     p.play();
   });
 
-  // 1. DİNAMİK SANAL BAR & KEEPAWAKE YÖNETİMİ
+  // KeepAwake ve Immersive Mode
   useEffect(() => {
     const enableImmersiveMode = async () => {
       StatusBar.setHidden(true, 'fade');
@@ -93,14 +99,14 @@ export default function PlayerEkrani({ route, navigation }) {
     };
   }, []);
 
-  // 2. ÖĞRENİLEN MANTIK: AsyncStorage'dan Kaldığı Yeri Okuma
+  // AsyncStorage Kaldığı Yeri Yükleme
   useEffect(() => {
     const restoreSavedPosition = async () => {
       try {
         const savedPosition = await AsyncStorage.getItem(`watch_progress_${contentId}`);
         if (savedPosition && player && !isPositionRestored.current) {
           const parsedTime = parseFloat(savedPosition);
-          if (parsedTime > 5) { // İlk 5 saniyeden sonra kaldıysa atlat
+          if (parsedTime > 5) {
             player.currentTime = parsedTime;
             setCurrentTime(parsedTime);
           }
@@ -116,7 +122,7 @@ export default function PlayerEkrani({ route, navigation }) {
     }
   }, [player, contentId]);
 
-  // 3. ÖĞRENİLEN MANTIK: AsyncStorage'a Anlık Pozisyon Kaydetme
+  // Anlık İlerleme Kaydı
   useEffect(() => {
     if (!player || currentTime <= 0) return;
 
@@ -128,7 +134,6 @@ export default function PlayerEkrani({ route, navigation }) {
       }
     };
 
-    // Her 5 saniyede bir kaydet
     const timer = setTimeout(saveProgress, 5000);
     return () => clearTimeout(timer);
   }, [currentTime, contentId, player]);
@@ -149,30 +154,35 @@ export default function PlayerEkrani({ route, navigation }) {
     return () => subscription.remove();
   }, [isFocused, player]);
 
-  // Periyodik Takip & Hata Kontrolü
+  // Periyodik Takip
   useEffect(() => {
     if (!player) return;
     const interval = setInterval(() => {
       try {
-        if (player.currentTime !== undefined) setCurrentTime(player.currentTime || 0);
-        if (player.duration !== undefined && player.duration > 0) setDuration(player.duration);
-        if (player.bufferedPosition !== undefined) setBuffered(player.bufferedPosition || 0);
+        if (!isSliding && player.currentTime !== undefined) {
+          setCurrentTime(player.currentTime || 0);
+        }
+        if (player.duration !== undefined && player.duration > 0) {
+          setDuration(player.duration);
+        }
+        if (player.bufferedPosition !== undefined) {
+          setBuffered(player.bufferedPosition || 0);
+        }
         setIsPlaying(player.playing);
         
-        // Hata durumunu sıfırla (video başarılı oynuyorsa)
         if (player.playing && hasError) setHasError(false);
       } catch (e) {
         setHasError(true);
       }
-    }, 500);
+    }, 400);
     return () => clearInterval(interval);
-  }, [player, hasError]);
+  }, [player, hasError, isSliding]);
 
   const resetControlsTimeout = () => {
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     setShowControls(true);
     controlsTimeoutRef.current = setTimeout(() => {
-      if (player && player.playing && !showSettingsModal) {
+      if (player && player.playing && !showSettingsModal && !isSliding) {
         setShowControls(false);
       }
     }, 4000);
@@ -183,6 +193,26 @@ export default function PlayerEkrani({ route, navigation }) {
     return () => clearTimeout(controlsTimeoutRef.current);
   }, []);
 
+  // SLIDER SÜRÜKLEME ETKİLEŞİMLERİ
+  const handleSlidingStart = () => {
+    setIsSliding(true);
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+  };
+
+  const handleSlidingValueChange = (value) => {
+    setSlidingTime(value);
+  };
+
+  const handleSlidingComplete = (value) => {
+    if (player) {
+      player.currentTime = value;
+      setCurrentTime(value);
+    }
+    setIsSliding(false);
+    resetControlsTimeout();
+  };
+
+  // Çift Tıklama Sarma
   const handleTouchArea = (side) => {
     const now = Date.now();
     const DOUBLE_TAP_DELAY = 300;
@@ -191,17 +221,18 @@ export default function PlayerEkrani({ route, navigation }) {
       lastTapRef.current.side === side &&
       now - lastTapRef.current.time < DOUBLE_TAP_DELAY
     ) {
-      if (side === 'left') {
-        const newTime = Math.max(0, currentTime - 10);
-        player.currentTime = newTime;
-        setCurrentTime(newTime);
-        showSeekFeedbackAnimation('rewind');
-      } else if (side === 'right') {
-        const newTime = Math.min(duration, currentTime + 10);
-        player.currentTime = newTime;
-        setCurrentTime(newTime);
-        showSeekFeedbackAnimation('forward');
+      if (player) {
+        if (side === 'left') {
+          player.currentTime = Math.max(0, player.currentTime - 10);
+        } else if (side === 'right') {
+          player.currentTime = Math.min(duration, player.currentTime + 10);
+        }
       }
+
+      setSeekSide(side);
+      if (seekTimeoutRef.current) clearTimeout(seekTimeoutRef.current);
+      seekTimeoutRef.current = setTimeout(() => setSeekSide(null), 700);
+
       lastTapRef.current = { time: 0, side: null };
     } else {
       lastTapRef.current = { time: now, side };
@@ -214,11 +245,6 @@ export default function PlayerEkrani({ route, navigation }) {
     }
   };
 
-  const showSeekFeedbackAnimation = (type) => {
-    setSeekFeedback(type);
-    setTimeout(() => setSeekFeedback(null), 800);
-  };
-
   const togglePlayPause = () => {
     if (!player) return;
     if (player.playing) {
@@ -229,16 +255,6 @@ export default function PlayerEkrani({ route, navigation }) {
       setIsPlaying(true);
     }
     resetControlsTimeout();
-  };
-
-  const handleSeek = (event) => {
-    const { locationX, width } = event.nativeEvent;
-    if (duration > 0 && width > 0 && player) {
-      const seekToTime = (locationX / width) * duration;
-      player.currentTime = seekToTime;
-      setCurrentTime(seekToTime);
-      resetControlsTimeout();
-    }
   };
 
   const retryPlayback = () => {
@@ -267,39 +283,35 @@ export default function PlayerEkrani({ route, navigation }) {
     setActiveTab('main');
   };
 
-  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
-  const bufferPercent = duration > 0 ? (buffered / duration) * 100 : 0;
-
   return (
     <SafeAreaView style={styles.container} edges={[]}>
       <StatusBar hidden />
       <View style={styles.videoContainer}>
         <VideoView style={styles.video} player={player} nativeControls={false} />
 
-        {/* Dokunma Alanları */}
+        {/* DOKUNMA ALANLARI */}
         <Pressable
           style={[styles.touchZone, { left: 0 }]}
           onPress={() => handleTouchArea('left')}
-        />
+        >
+          {seekSide === 'left' && (
+            <View style={styles.seekSideWrapper}>
+              <Text style={styles.seekSideText}>{"<     -10"}</Text>
+            </View>
+          )}
+        </Pressable>
+
         <Pressable
           style={[styles.touchZone, { right: 0 }]}
           onPress={() => handleTouchArea('right')}
-        />
+        >
+          {seekSide === 'right' && (
+            <View style={styles.seekSideWrapper}>
+              <Text style={styles.seekSideText}>{" +10     > "}</Text>
+            </View>
+          )}
+        </Pressable>
 
-        {seekFeedback && (
-          <View style={styles.feedbackOverlay}>
-            <Ionicons
-              name={seekFeedback === 'rewind' ? 'play-back' : 'play-forward'}
-              size={48}
-              color="#fff"
-            />
-            <Text style={styles.feedbackText}>
-              {seekFeedback === 'rewind' ? '-10 Saniye' : '+10 Saniye'}
-            </Text>
-          </View>
-        )}
-
-        {/* HATA / KOPMA OVERLAY'İ */}
         {hasError && (
           <View style={styles.errorOverlay}>
             <Ionicons name="alert-circle-outline" size={54} color="#e50914" />
@@ -316,7 +328,7 @@ export default function PlayerEkrani({ route, navigation }) {
           </View>
         )}
 
-        {/* OVERLAY */}
+        {/* KONTROL OVERLAY */}
         {showControls && !hasError && (
           <View style={styles.overlay} pointerEvents="box-none">
             {/* ÜST BAR */}
@@ -342,26 +354,45 @@ export default function PlayerEkrani({ route, navigation }) {
 
             {/* ALT BAR */}
             <View style={styles.bottomBar}>
-              <Pressable style={styles.seekbarContainer} onPress={handleSeek}>
-                <View style={styles.seekbarTrack}>
-                  <View
-                    style={[
-                      styles.seekbarBuffer,
-                      { width: `${Math.min(bufferPercent, 100)}%` },
-                    ]}
-                  />
-                  <View
-                    style={[
-                      styles.seekbarProgress,
-                      { width: `${Math.min(progressPercent, 100)}%` },
-                    ]}
-                  />
+              {isSliding && (
+                <View style={styles.timeBadgeOverlay}>
+                  <View style={styles.timeBadge}>
+                    <Ionicons name="time-outline" size={16} color="#7709e5" style={{ marginRight: 6 }} />
+                    <Text style={styles.timeBadgeText}>{formatTime(slidingTime)}</Text>
+                  </View>
                 </View>
-              </Pressable>
+              )}
+
+              {/* SLIDER */}
+              <View style={styles.sliderContainer}>
+                {Slider ? (
+                  <Slider
+                    style={styles.slider}
+                    minimumValue={0}
+                    maximumValue={duration > 0 ? duration : 1}
+                    value={isSliding ? slidingTime : currentTime}
+                    minimumTrackTintColor="#7709e5"
+                    maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
+                    thumbTintColor="#7709e5"
+                    onSlidingStart={handleSlidingStart}
+                    onValueChange={handleSlidingValueChange}
+                    onSlidingComplete={handleSlidingComplete}
+                  />
+                ) : (
+                  <View style={styles.customProgressBarBackground}>
+                    <View 
+                      style={[
+                        styles.customProgressBarFill, 
+                        { width: `${(currentTime / (duration || 1)) * 100}%` }
+                      ]} 
+                    />
+                  </View>
+                )}
+              </View>
 
               <View style={styles.bottomControlsRow}>
                 <Text style={styles.timeText}>
-                  {formatTime(currentTime)} / {formatTime(duration)}
+                  {formatTime(isSliding ? slidingTime : currentTime)} / {formatTime(duration)}
                 </Text>
 
                 <Pressable
@@ -534,22 +565,21 @@ const styles = StyleSheet.create({
     bottom: 50,
     width: '40%',
     zIndex: 5,
-  },
-  feedbackOverlay: {
-    position: 'absolute',
-    alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
+    justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 20,
   },
-  feedbackText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    marginTop: 4,
-    fontSize: 13,
+  seekSideWrapper: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  seekSideText: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '500',
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -628,26 +658,42 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingBottom: 4,
   },
-  seekbarContainer: {
-    height: 20,
+  timeBadgeOverlay: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  timeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(14, 14, 14, 0.95)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#7709e5',
+  },
+  timeBadgeText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  sliderContainer: {
+    width: '100%',
+    height: 30,
     justifyContent: 'center',
-    width: '100%',
   },
-  seekbarTrack: {
-    height: 5,
+  slider: {
+    width: '100%',
+    height: 40,
+  },
+  customProgressBarBackground: {
+    width: '100%',
+    height: 4,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 3,
-    position: 'relative',
+    borderRadius: 2,
     overflow: 'hidden',
-    width: '100%',
   },
-  seekbarBuffer: {
-    position: 'absolute',
-    height: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  seekbarProgress: {
-    position: 'absolute',
+  customProgressBarFill: {
     height: '100%',
     backgroundColor: '#7709e5',
   },
@@ -655,7 +701,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 6,
+    marginTop: 2,
   },
   timeText: {
     color: '#fff',
@@ -667,7 +713,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: 20,
   },
-
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
