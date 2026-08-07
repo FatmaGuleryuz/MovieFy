@@ -1,6 +1,6 @@
+import React from "react";
 import { getImageUrl } from "../api/imageHelper";
 
-// 1. Yeni proplarımızı (isFavorite ve onToggleFavorite) ekledik
 const MovieCard = ({ movie, mediaType, onSelect, isFavorite, onToggleFavorite }) => {
   const rating = movie?.vote_average ? movie.vote_average.toFixed(1) : "0.0";
   const currentMediaType = movie?.media_type || mediaType || "movie";
@@ -13,15 +13,15 @@ const MovieCard = ({ movie, mediaType, onSelect, isFavorite, onToggleFavorite })
         width: '100%', 
         height: 'auto', 
         cursor: 'pointer',
-        position: 'relative' // Butonun kartın içine oturması için eklendi
+        position: 'relative'
       }}
     >
       <span className="rating-badge">{rating}</span>
 
-      {/* 🌟 YENİ: FAVORİ (KALP) BUTONU 🌟 */}
+      {/* FAVORİ (KALP) BUTONU */}
       <button
         onClick={(e) => {
-          e.stopPropagation(); // ⚡ ÇOK KRİTİK: Tıklamanın karta sıçrayıp modalı açmasını engeller
+          e.stopPropagation(); 
           if (onToggleFavorite) onToggleFavorite(movie);
         }}
         style={{
@@ -38,9 +38,10 @@ const MovieCard = ({ movie, mediaType, onSelect, isFavorite, onToggleFavorite })
           justifyContent: 'center',
           cursor: 'pointer',
           zIndex: 10,
-          color: isFavorite ? '#e50914' : 'white', // Favoriyse Netflix kırmızısı, değilse beyaz
+          color: isFavorite ? '#c084fc' : 'white', // Beğenildiyse mor renk
           fontSize: '18px',
-          transition: 'transform 0.2s ease',
+          transition: 'transform 0.2s ease, color 0.2s ease',
+          filter: isFavorite ? 'drop-shadow(0 0 6px rgba(192, 132, 252, 0.6))' : 'none'
         }}
         onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
         onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
@@ -54,6 +55,7 @@ const MovieCard = ({ movie, mediaType, onSelect, isFavorite, onToggleFavorite })
           src={getImageUrl(movie.poster_path, 'w500')} 
           alt={movie.title || movie.name} 
           className="movie-poster"
+          loading="lazy" // 🌟 PERFORMANS İÇİN LAZY LOADING EKLENDİ 🌟
           style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }}
         />
       ) : (
