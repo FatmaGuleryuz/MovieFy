@@ -56,14 +56,32 @@ const MovieModal = ({ movieId, mediaType = "movie", onClose, onSelectPerson, fav
   const title = data?.title || data?.name;
   const releaseYear = (data?.release_date || data?.first_air_date)?.slice(0, 4);
 
-  // Bu içeriğin favorilerde olup olmadığını O(1) hızında kontrol ediyoruz
   const isFavorite = favorites ? favorites.has(Number(movieId)) : false;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+    /* 🌟 GLASSMORPHISM OVERLAY: Arka planı koyu ve blur yaptık */
+    <div 
+      className="modal-overlay" 
+      onClick={onClose}
+      style={{
+        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)'
+      }}
+    >
+      {/* 🌟 GLASSMORPHISM CONTENT: Şeffaf cam kutu, ince parlak kenar çizgisi */}
+      <div 
+        className="modal-content" 
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'linear-gradient(135deg, rgba(20, 20, 25, 0.85) 0%, rgba(10, 10, 12, 0.95) 100%)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 30px rgba(147, 51, 234, 0.15)'
+        }}
+      >
         
-        {/* TAM EKRAN VE SİYAH BOŞLUKSUZ PLAYER ALANI */}
         {isPlayerOpen ? (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <button 
@@ -85,7 +103,6 @@ const MovieModal = ({ movieId, mediaType = "movie", onClose, onSelectPerson, fav
             </div>
           </div>
         ) : (
-          /* DETAYLAR ALANI */
           <>
             <button className="modal-close-btn" onClick={onClose}>✕</button>
 
@@ -108,12 +125,8 @@ const MovieModal = ({ movieId, mediaType = "movie", onClose, onSelectPerson, fav
                       {isTV && data.number_of_seasons && <span>{data.number_of_seasons} Sezon</span>}
                     </div>
                     
-                    {/* 🌟 KALP VE OYNAT BUTONLARININ YANYANA YERLEŞTİRİLDİĞİ ALAN 🌟 */}
                     <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '20px', marginTop: '15px' }}>
                       
-                      {/* 1. SOL TARAF: KALP (BEĞENİ) BUTONU (MOR RENK) */}
-                     {/* 1. SOL TARAF: ÇERÇEVESİZ SAF KALP BUTONU */}
-                     {/* 1. SOL TARAF: SVG VEKTÖR SAF KALP BUTONU */}
                       <button
                         onClick={() => {
                           if (onToggleFavorite) {
@@ -160,7 +173,6 @@ const MovieModal = ({ movieId, mediaType = "movie", onClose, onSelectPerson, fav
                         </svg>
                       </button>
 
-                      {/* 2. SAĞ TARAF: METALİK MOR OYNAT BUTONU */}
                       <button 
                         onClick={() => setIsPlayerOpen(true)}
                         style={{
@@ -209,7 +221,12 @@ const MovieModal = ({ movieId, mediaType = "movie", onClose, onSelectPerson, fav
                       <div className="cast-list">
                         {data.credits.cast.slice(0, 8).map((actor) => (
                           <div key={actor.id} className="cast-card" style={{ cursor: 'pointer' }} onClick={() => { if (typeof onSelectPerson === "function") onSelectPerson(actor.id); }}>
-                            <img src={getImageUrl(actor.profile_path, "w185")} alt={actor.name} onError={(e) => { e.target.src = "https://via.placeholder.com/130x73?text=No+Image"; }} />
+                            <img 
+                              src={getImageUrl(actor.profile_path, "w185")} 
+                              alt={actor.name} 
+                              loading="lazy"
+                              onError={(e) => { e.target.src = "https://via.placeholder.com/130x73?text=No+Image"; }} 
+                            />
                             <p className="actor-name">{actor.name}</p>
                             <p className="character-name">{actor.character}</p>
                           </div>
