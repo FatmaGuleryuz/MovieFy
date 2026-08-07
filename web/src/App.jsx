@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css'; 
 import Navbar from './components/Navbar';
 import HeroBanner from './components/HeroBanner';
@@ -57,6 +57,32 @@ const App = () => {
     }
   };
 
+  const [continueWatching, setContinueWatching] = useState([]);
+
+ useEffect(() => {
+    // 1. Tüm listeler yüklendikten sonra çalışması için genel bir havuz oluşturuyoruz
+    const allFetchedMovies = [...trendingMovies, ...nowPlaying, ...topRated, ...popularMovies, ...popularTV];
+
+    if (allFetchedMovies.length === 0) return;
+
+    // 2. LocalStorage'daki tüm 'continue_watch_' ile başlayan verileri tarayıp topluyoruz
+    const keys = Object.keys(localStorage);
+    const cwItems = keys
+      .filter(key => key.startsWith('continue_watch_'))
+      .map(key => JSON.parse(localStorage.getItem(key)))
+      .sort((a, b) => b.updatedAt - a.updatedAt); // En son izlediğini en başa koy
+
+    // 3. Elimizdeki ID'leri, ana sayfadaki filmlerle eşleştirip afiş/isim bilgilerini çekiyoruz
+    const matchedMovies = cwItems.map(item => {
+      return allFetchedMovies.find(m => String(m.id) === String(item.movieId));
+    }).filter(Boolean); // Bulunamayanları (undefined) temizle
+
+    // 4. Aynı filmi iki kez göstermemek için filtreleyip state'e aktarıyoruz
+    const uniqueMovies = Array.from(new Set(matchedMovies.map(a => a.id)))
+      .map(id => matchedMovies.find(a => a.id === id));
+
+    setContinueWatching(uniqueMovies);
+  }, [trendingMovies, nowPlaying, topRated, popularMovies, popularTV]);
   const [filteredMovies, setFilteredMovies] = useState([]);
 
   const handleSelectMedia = (id, mediaType = 'movie') => {
@@ -88,7 +114,6 @@ const App = () => {
         setPopularTV(tvData?.results || []);
 
         // ⚡ HERO BANNER GARANTİ SİSTEMİ:
-        // Trendler varsa ilkini al, yoksa Vizyondakiler'den, o da yoksa Popüler'den al!
         const fallbackHero = trendList[0] || nowPlayingList[0] || popularList[0] || null;
         setHeroMovie(fallbackHero);
         setDefaultHeroMovie(fallbackHero);
@@ -157,6 +182,17 @@ const App = () => {
               />
             ) : (
               <>
+                {/* 🌟 İZLEMEYE DEVAM ET ŞERİDİ BURAYA EKLENDİ 🌟 */}
+                {continueWatching.length > 0 && (
+                  <MovieRow 
+                    title="İzlemeye Devam Et" 
+                    movies={continueWatching} 
+                    isLargeRow={true} 
+                    onSelectMovie={handleSelectMedia} 
+                    onSelectMedia={handleSelectMedia}
+                  />
+                )}
+
                 {trendingMovies.length > 0 && (
                   <MovieRow title="Günün Trendleri" movies={trendingMovies} isLoading={loading} onSelectMovie={handleSelectMedia} onSelectMedia={handleSelectMedia} />
                 )}

@@ -271,16 +271,44 @@ const Player = ({ src = TEST_STREAM, movieId = "demo-movie" }) => {
           opacity: showControls ? 1 : 0, transition: 'opacity 0.3s ease', zIndex: 20
         }}
       >
-        {/* İlerleme Çubuğu (Seekbar) */}
-        <input
-          type="range"
-          min={0}
-          max={state.duration || 100}
-          value={state.currentTime}
-          onChange={handleSeek}
-          style={{ width: '100%', height: '4px', cursor: 'pointer', accentColor: '#9333ea' }}
-        />
+       {/* İlerleme Çubuğu (Seekbar) ve Zaman Önizleme Alanı */}
+        <div 
+          style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center', padding: '10px 0', cursor: 'pointer' }}
+          onMouseMove={handleSeekBarMouseMove}
+          onMouseLeave={() => setHoverTime(null)}
+        >
+          {/* Hover Tooltip (Zaman Baloncuğu) */}
+          {hoverTime !== null && (
+            <div style={{
+              position: 'absolute',
+              bottom: '100%',
+              left: `${hoverPos}px`,
+              transform: 'translateX(-50%)',
+              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              color: 'white',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              fontSize: '12px',
+              pointerEvents: 'none',
+              marginBottom: '2px',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 2px 5px rgba(0,0,0,0.5)'
+            }}>
+              {formatTime(hoverTime)}
+            </div>
+          )}
+          
+          <input
+            type="range"
+            min={0}
+            max={state.duration || 100}
+            value={state.currentTime}
+            onChange={handleSeek}
+            style={{ width: '100%', height: '4px', cursor: 'pointer', accentColor: '#9333ea', margin: 0 }}
+          />
+        </div>
 
+        
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'white', marginTop: '5px' }}>
           
           {/* Sol Kısım: Play, Ses, Süre */}
