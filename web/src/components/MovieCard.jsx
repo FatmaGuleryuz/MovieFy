@@ -1,7 +1,7 @@
 import React from "react";
 import { getImageUrl } from "../api/imageHelper";
 
-const MovieCard = ({ movie, mediaType, onSelect, isFavorite, onToggleFavorite }) => {
+const MovieCard = React.memo(({ movie, mediaType, onSelect, isFavorite, onToggleFavorite }) => {
   const rating = movie?.vote_average ? movie.vote_average.toFixed(1) : "0.0";
   const currentMediaType = movie?.media_type || mediaType || "movie";
 
@@ -38,7 +38,7 @@ const MovieCard = ({ movie, mediaType, onSelect, isFavorite, onToggleFavorite })
           justifyContent: 'center',
           cursor: 'pointer',
           zIndex: 10,
-          color: isFavorite ? '#c084fc' : 'white', // Beğenildiyse mor renk
+          color: isFavorite ? '#c084fc' : 'white',
           fontSize: '18px',
           transition: 'transform 0.2s ease, color 0.2s ease',
           filter: isFavorite ? 'drop-shadow(0 0 6px rgba(192, 132, 252, 0.6))' : 'none'
@@ -55,7 +55,7 @@ const MovieCard = ({ movie, mediaType, onSelect, isFavorite, onToggleFavorite })
           src={getImageUrl(movie.poster_path, 'w500')} 
           alt={movie.title || movie.name} 
           className="movie-poster"
-          loading="lazy" // 🌟 PERFORMANS İÇİN LAZY LOADING EKLENDİ 🌟
+          loading="lazy"
           style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }}
         />
       ) : (
@@ -63,6 +63,6 @@ const MovieCard = ({ movie, mediaType, onSelect, isFavorite, onToggleFavorite })
       )}
     </div>
   );
-};
+});
 
 export default MovieCard;
