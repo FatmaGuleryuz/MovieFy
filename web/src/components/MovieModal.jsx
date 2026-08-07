@@ -4,7 +4,7 @@ import { getImageUrl } from "../api/imageHelper";
 import "./MovieModal.css";
 import Player from "./Player";
 
-const MovieModal = ({ movieId, mediaType = "movie", onClose, onSelectPerson }) => {
+const MovieModal = ({ movieId, mediaType = "movie", onClose, onSelectPerson, favorites, onToggleFavorite }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedSeason, setSelectedSeason] = useState(1);
@@ -55,7 +55,9 @@ const MovieModal = ({ movieId, mediaType = "movie", onClose, onSelectPerson }) =
   const isTV = mediaType === "tv";
   const title = data?.title || data?.name;
   const releaseYear = (data?.release_date || data?.first_air_date)?.slice(0, 4);
-  const trailer = data?.videos?.results?.find((vid) => vid.type === "Trailer" || vid.type === "Teaser");
+
+  // Bu içeriğin favorilerde olup olmadığını O(1) hızında kontrol ediyoruz
+  const isFavorite = favorites ? favorites.has(Number(movieId)) : false;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -106,8 +108,59 @@ const MovieModal = ({ movieId, mediaType = "movie", onClose, onSelectPerson }) =
                       {isTV && data.number_of_seasons && <span>{data.number_of_seasons} Sezon</span>}
                     </div>
                     
-                    {/* YENİ ÇERÇEVESİZ, METALİK MOR OYNAT BUTONU (Zorunlu Sola Yaslı Div ile) */}
-                    <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', marginTop: '15px' }}>
+                    {/* 🌟 KALP VE OYNAT BUTONLARININ YANYANA YERLEŞTİRİLDİĞİ ALAN 🌟 */}
+                    <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '20px', marginTop: '15px' }}>
+                      
+                      {/* 1. SOL TARAF: KALP (BEĞENİ) BUTONU (MOR RENK) */}
+                     {/* 1. SOL TARAF: ÇERÇEVESİZ SAF KALP BUTONU */}
+                     {/* 1. SOL TARAF: SVG VEKTÖR SAF KALP BUTONU */}
+                      <button
+                        onClick={() => {
+                          if (onToggleFavorite) {
+                            onToggleFavorite({
+                              id: data.id,
+                              title: data.title,
+                              name: data.name,
+                              poster_path: data.poster_path,
+                              vote_average: data.vote_average,
+                              media_type: mediaType
+                            });
+                          }
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: 0,
+                          margin: 0,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'transform 0.3s ease',
+                          filter: isFavorite 
+                            ? 'drop-shadow(0 0 10px rgba(192, 132, 252, 0.8))' 
+                            : 'drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6))'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
+                        onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                        title={isFavorite ? "Favorilerden Çıkar" : "Favorilere Ekle"}
+                      >
+                        <svg 
+                          width="34" 
+                          height="34" 
+                          viewBox="0 0 24 24" 
+                          fill={isFavorite ? "#c084fc" : "none"} 
+                          stroke={isFavorite ? "#c084fc" : "white"} 
+                          strokeWidth="1" 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round"
+                          style={{ transition: 'fill 0.2s ease, stroke 0.2s ease' }}
+                        >
+                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                        </svg>
+                      </button>
+
+                      {/* 2. SAĞ TARAF: METALİK MOR OYNAT BUTONU */}
                       <button 
                         onClick={() => setIsPlayerOpen(true)}
                         style={{
@@ -134,6 +187,7 @@ const MovieModal = ({ movieId, mediaType = "movie", onClose, onSelectPerson }) =
                           e.currentTarget.style.transform = 'scale(1)';
                           e.currentTarget.style.filter = 'drop-shadow(0 4px 10px rgba(147, 51, 234, 0.4))';
                         }}
+                        title="Oynat"
                       >
                         ▶
                       </button>

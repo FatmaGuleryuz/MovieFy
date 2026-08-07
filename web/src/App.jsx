@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import './App.css'; 
 import Navbar from './components/Navbar';
 import HeroBanner from './components/HeroBanner';
 import MovieRow from './components/MovieRow';
-import MovieModal from './components/MovieModal';
-import PersonModal from './components/PersonModal';
 import { 
   getDailyTrending, 
   getPopularMovies, 
@@ -14,6 +12,10 @@ import {
   getMoviesByGenre,
   getTVByGenre
 } from './api/movieService';
+
+// 🌟 LAZY COMPONENTLER DOSYANIN EN ÜSTÜNE TAŞINDI (Böylece her renderda sıfırlanmazlar)
+const MovieModal = lazy(() => import('./components/MovieModal'));
+const PersonModal = lazy(() => import('./components/PersonModal'));
 
 const App = () => {
   const [heroMovie, setHeroMovie] = useState(null);
@@ -33,8 +35,42 @@ const App = () => {
   
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [genreMediaType, setGenreMediaType] = useState('movie');
+  
+  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
+
+  const [favoriteMovies, setFavoriteMovies] = useState(() => {
+    const savedData = localStorage.getItem('my_favorites_data');
+    return savedData ? JSON.parse(savedData) : [];
+  });
+
+  const [favorites, setFavorites] = useState(() => {
+    const savedData = localStorage.getItem('my_favorites_data');
+    const parsed = savedData ? JSON.parse(savedData) : [];
+    return new Set(parsed.map(m => m.id));
+  });
+
+  const toggleFavorite = (movie) => {
+    setFavorites((prevFavorites) => {
+      const newFavorites = new Set(prevFavorites);
+      let newFavMovies = [...favoriteMovies];
+      
+      if (newFavorites.has(movie.id)) { 
+        newFavorites.delete(movie.id); 
+        newFavMovies = newFavMovies.filter(m => m.id !== movie.id); 
+      } else {
+        newFavorites.add(movie.id); 
+        newFavMovies.push(movie); 
+      }
+      
+      setFavoriteMovies(newFavMovies);
+      localStorage.setItem('my_favorites_data', JSON.stringify(newFavMovies));
+      
+      return newFavorites;
+    });
+  };
 
   const handleSelectGenre = async (genreId, type = 'movie') => {
+    setShowOnlyFavorites(false); 
     setSelectedGenre(genreId);
     setGenreMediaType(type);
 
@@ -59,30 +95,27 @@ const App = () => {
 
   const [continueWatching, setContinueWatching] = useState([]);
 
- useEffect(() => {
-    // 1. Tüm listeler yüklendikten sonra çalışması için genel bir havuz oluşturuyoruz
+  useEffect(() => {
     const allFetchedMovies = [...trendingMovies, ...nowPlaying, ...topRated, ...popularMovies, ...popularTV];
 
     if (allFetchedMovies.length === 0) return;
 
-    // 2. LocalStorage'daki tüm 'continue_watch_' ile başlayan verileri tarayıp topluyoruz
     const keys = Object.keys(localStorage);
     const cwItems = keys
       .filter(key => key.startsWith('continue_watch_'))
       .map(key => JSON.parse(localStorage.getItem(key)))
-      .sort((a, b) => b.updatedAt - a.updatedAt); // En son izlediğini en başa koy
+      .sort((a, b) => b.updatedAt - a.updatedAt); 
 
-    // 3. Elimizdeki ID'leri, ana sayfadaki filmlerle eşleştirip afiş/isim bilgilerini çekiyoruz
     const matchedMovies = cwItems.map(item => {
       return allFetchedMovies.find(m => String(m.id) === String(item.movieId));
-    }).filter(Boolean); // Bulunamayanları (undefined) temizle
+    }).filter(Boolean); 
 
-    // 4. Aynı filmi iki kez göstermemek için filtreleyip state'e aktarıyoruz
     const uniqueMovies = Array.from(new Set(matchedMovies.map(a => a.id)))
       .map(id => matchedMovies.find(a => a.id === id));
 
     setContinueWatching(uniqueMovies);
   }, [trendingMovies, nowPlaying, topRated, popularMovies, popularTV]);
+  
   const [filteredMovies, setFilteredMovies] = useState([]);
 
   const handleSelectMedia = (id, mediaType = 'movie') => {
@@ -113,7 +146,6 @@ const App = () => {
         setPopularMovies(popularList);
         setPopularTV(tvData?.results || []);
 
-        // ⚡ HERO BANNER GARANTİ SİSTEMİ:
         const fallbackHero = trendList[0] || nowPlayingList[0] || popularList[0] || null;
         setHeroMovie(fallbackHero);
         setDefaultHeroMovie(fallbackHero);
@@ -131,11 +163,14 @@ const App = () => {
 
   return (
     <div className="app" style={{ backgroundColor: '#000000', color: '#ffffff', minHeight: '100vh', width: '100%' }}>
-      {/* Navbar */}
       <Navbar 
         onSelectMedia={handleSelectMedia}
         onSelectPerson={(id) => setSelectedPersonId(id)}
         onSelectGenre={handleSelectGenre}
+        onShowFavorites={() => {
+          setShowOnlyFavorites(true);
+          setSelectedGenre(null);
+        }}
       />
 
       {error ? (
@@ -166,12 +201,29 @@ const App = () => {
         </div>
       ) : (
         <>
-          {/* Garanti Hero Banner */}
-          {heroMovie && <HeroBanner movie={heroMovie} />}
+          {!showOnlyFavorites && heroMovie && <HeroBanner movie={heroMovie} />}
 
-          <div className="main-container" style={{ marginTop: heroMovie ? '-60px' : '80px', position: 'relative', zIndex: '2', width: '100%', paddingLeft: '4%', boxSizing: 'border-box' }}>
+          <div className="main-container" style={{ marginTop: !showOnlyFavorites && heroMovie ? '-60px' : '40px', position: 'relative', zIndex: '2', width: '100%', paddingLeft: '4%', boxSizing: 'border-box' }}>
             
-            {selectedGenre !== null ? (
+            {showOnlyFavorites ? (
+              <div style={{ padding: '20px 0 50px 0' }}>
+                <h1 style={{ fontSize: '2rem', marginBottom: '20px', color: '#fff' }}>Listem</h1>
+                {favoriteMovies.length > 0 ? (
+                  <MovieRow 
+                    title="" 
+                    movies={favoriteMovies} 
+                    onSelectMovie={handleSelectMedia} 
+                    onSelectMedia={handleSelectMedia}
+                    favorites={favorites} 
+                    onToggleFavorite={toggleFavorite}
+                  />
+                ) : (
+                  <div style={{ color: '#aaa', fontSize: '1.1rem', marginTop: '20px' }}>
+                    Henüz favorilere eklenmiş bir içerik yok. Kartlardaki kalp ikonuna tıklayarak listeni oluşturabilirsin! ♥
+                  </div>
+                )}
+              </div>
+            ) : selectedGenre !== null ? (
               <MovieRow 
                 title={`Seçilen Türe Ait ${genreMediaType === 'tv' ? 'Diziler' : 'Filmler'}`}
                 movies={filteredMovies} 
@@ -179,10 +231,22 @@ const App = () => {
                 mediaType={genreMediaType}
                 onSelectMovie={handleSelectMedia}
                 onSelectMedia={handleSelectMedia}
+                favorites={favorites} 
+                onToggleFavorite={toggleFavorite}
               />
             ) : (
               <>
-                {/* 🌟 İZLEMEYE DEVAM ET ŞERİDİ BURAYA EKLENDİ 🌟 */}
+                {favoriteMovies.length > 0 && (
+                  <MovieRow 
+                    title="Listem" 
+                    movies={favoriteMovies} 
+                    onSelectMovie={handleSelectMedia} 
+                    onSelectMedia={handleSelectMedia}
+                    favorites={favorites} 
+                    onToggleFavorite={toggleFavorite}
+                  />
+                )}
+
                 {continueWatching.length > 0 && (
                   <MovieRow 
                     title="İzlemeye Devam Et" 
@@ -190,16 +254,18 @@ const App = () => {
                     isLargeRow={true} 
                     onSelectMovie={handleSelectMedia} 
                     onSelectMedia={handleSelectMedia}
+                    favorites={favorites} 
+                    onToggleFavorite={toggleFavorite}
                   />
                 )}
 
                 {trendingMovies.length > 0 && (
-                  <MovieRow title="Günün Trendleri" movies={trendingMovies} isLoading={loading} onSelectMovie={handleSelectMedia} onSelectMedia={handleSelectMedia} />
+                  <MovieRow title="Günün Trendleri" movies={trendingMovies} isLoading={loading} onSelectMovie={handleSelectMedia} onSelectMedia={handleSelectMedia} favorites={favorites} onToggleFavorite={toggleFavorite} />
                 )}
-                <MovieRow title="Vizyondakiler" movies={nowPlaying} isLoading={loading} mediaType="movie" onSelectMovie={handleSelectMedia} onSelectMedia={handleSelectMedia} />
-                <MovieRow title="En Yüksek Puanlılar" movies={topRated} isLoading={loading} mediaType="movie" onSelectMovie={handleSelectMedia} onSelectMedia={handleSelectMedia} />
-                <MovieRow title="Popüler Filmler" movies={popularMovies} isLoading={loading} mediaType="movie" onSelectMovie={handleSelectMedia} onSelectMedia={handleSelectMedia} />
-                <MovieRow title="Popüler Diziler" movies={popularTV} isLoading={loading} mediaType="tv" onSelectMovie={handleSelectMedia} onSelectMedia={handleSelectMedia} />
+                <MovieRow title="Vizyondakiler" movies={nowPlaying} isLoading={loading} mediaType="movie" onSelectMovie={handleSelectMedia} onSelectMedia={handleSelectMedia} favorites={favorites} onToggleFavorite={toggleFavorite} />
+                <MovieRow title="En Yüksek Puanlılar" movies={topRated} isLoading={loading} mediaType="movie" onSelectMovie={handleSelectMedia} onSelectMedia={handleSelectMedia} favorites={favorites} onToggleFavorite={toggleFavorite} />
+                <MovieRow title="Popüler Filmler" movies={popularMovies} isLoading={loading} mediaType="movie" onSelectMovie={handleSelectMedia} onSelectMedia={handleSelectMedia} favorites={favorites} onToggleFavorite={toggleFavorite} />
+                <MovieRow title="Popüler Diziler" movies={popularTV} isLoading={loading} mediaType="tv" onSelectMovie={handleSelectMedia} onSelectMedia={handleSelectMedia} favorites={favorites} onToggleFavorite={toggleFavorite} />
               </>
             )}
 
@@ -207,23 +273,27 @@ const App = () => {
         </>
       )}
 
-      {/* Modallar */}
-      {selectedMedia && (
-        <MovieModal 
-          movieId={selectedMedia.id} 
-          mediaType={selectedMedia.mediaType}
-          onClose={() => setSelectedMedia(null)} 
-          onSelectPerson={(personId) => setSelectedPersonId(personId)}
-        />
-      )}
+      {/* 🌟 SUSPENSE İLE SARMALANAN LAZY MODALLAR */}
+      <Suspense fallback={null}>
+        {selectedMedia && (
+          <MovieModal 
+            movieId={selectedMedia.id} 
+            mediaType={selectedMedia.mediaType}
+            onClose={() => setSelectedMedia(null)} 
+            onSelectPerson={(personId) => setSelectedPersonId(personId)}
+            favorites={favorites} 
+            onToggleFavorite={toggleFavorite}
+          />
+        )}
 
-      {selectedPersonId && (
-        <PersonModal
-          personId={selectedPersonId}
-          onClose={() => setSelectedPersonId(null)}
-          onSelectMedia={(id, mediaType) => setSelectedMedia({ id, mediaType })} 
-        />
-      )}
+        {selectedPersonId && (
+          <PersonModal
+            personId={selectedPersonId}
+            onClose={() => setSelectedPersonId(null)}
+            onSelectMedia={(id, mediaType) => setSelectedMedia({ id, mediaType })} 
+          />
+        )}
+      </Suspense>
     </div>
   );
 };

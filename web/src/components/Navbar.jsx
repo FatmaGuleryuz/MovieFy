@@ -3,7 +3,6 @@ import { searchMulti, getGenres } from "../api/movieService";
 import { getImageUrl } from "../api/imageHelper";
 import "./Navbar.css";
 
-// API gecikirse veya hata verirse menü boş kalmasın diye sabit tür listesi
 const DEFAULT_GENRES = [
   { id: 28, name: "Aksiyon" },
   { id: 12, name: "Macera" },
@@ -19,20 +18,18 @@ const DEFAULT_GENRES = [
   { id: 10752, name: "Savaş" },
 ];
 
-const Navbar = ({ onSelectMedia, onSelectPerson, onSelectGenre }) => {
+// 🌟 YENİ: onShowFavorites prop'u eklendi
+const Navbar = ({ onSelectMedia, onSelectPerson, onSelectGenre, onShowFavorites }) => {
   const [scrolled, setScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
-
-  // Başlangıç değeri olarak sabit liste verdik ki asla boş siyah kutu kalmasın
   const [genres, setGenres] = useState(DEFAULT_GENRES);
   const [activeMenu, setActiveMenu] = useState(null);
 
   const searchRef = useRef(null);
 
-  // API'den canlı türleri çek
   useEffect(() => {
     const fetchGenres = async () => {
       try {
@@ -47,7 +44,6 @@ const Navbar = ({ onSelectMedia, onSelectPerson, onSelectGenre }) => {
     fetchGenres();
   }, []);
 
-  // Scroll takibi
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 30);
@@ -56,7 +52,6 @@ const Navbar = ({ onSelectMedia, onSelectPerson, onSelectGenre }) => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Debounce Mekanizması (Arama)
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
@@ -75,7 +70,6 @@ const Navbar = ({ onSelectMedia, onSelectPerson, onSelectGenre }) => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Arama dışına tıklandığında kapatma
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (searchRef.current && !searchRef.current.contains(e.target)) {
@@ -88,51 +82,27 @@ const Navbar = ({ onSelectMedia, onSelectPerson, onSelectGenre }) => {
 
   return (
     <header className={`custom-navbar ${scrolled ? "is-scrolled" : ""}`}>
-      {/* Sol Logo */}
-      <div 
-        className="brand-container" 
-        onClick={() => onSelectGenre && onSelectGenre(null)}
-      >
+      <div className="brand-container" onClick={() => onSelectGenre && onSelectGenre(null)}>
         <div className="brand-logo-icon">M</div>
         <span className="brand-text">movify<span className="dot">.</span></span>
       </div>
 
-      {/* Orta Menü */}
       <nav className="nav-menu">
-        <a 
-          href="#home" 
-          className="active" 
-          onClick={(e) => { e.preventDefault(); onSelectGenre && onSelectGenre(null); }}
-        >
+        <a href="#home" className="active" onClick={(e) => { e.preventDefault(); onSelectGenre && onSelectGenre(null); }}>
           Keşfet
         </a>
 
         {/* Filmler Sekmesi */}
-        <div 
-          className="nav-dropdown-wrapper"
-          onMouseEnter={() => setActiveMenu('movies')}
-          onMouseLeave={() => setActiveMenu(null)}
-        >
+        <div className="nav-dropdown-wrapper" onMouseEnter={() => setActiveMenu('movies')} onMouseLeave={() => setActiveMenu(null)}>
           <a href="#movies" onClick={(e) => e.preventDefault()}>Filmler</a>
           {activeMenu === 'movies' && (
             <div className="genre-dropdown-menu">
-              <button 
-                className="genre-dropdown-item all-btn"
-                onClick={() => { onSelectGenre && onSelectGenre(null); setActiveMenu(null); }}
-              >
+              <button className="genre-dropdown-item all-btn" onClick={() => { onSelectGenre && onSelectGenre(null); setActiveMenu(null); }}>
                 Tümü
               </button>
               <div className="dropdown-grid">
                 {genres.map((genre) => (
-                  <button
-                    key={genre.id}
-                    className="genre-dropdown-item"
-                    onClick={() => {
-                      // 2. Adım Düzenlemesi: Film olduğu için 'movie' gönderiyoruz
-                      onSelectGenre && onSelectGenre(genre.id, 'movie');
-                      setActiveMenu(null);
-                    }}
-                  >
+                  <button key={genre.id} className="genre-dropdown-item" onClick={() => { onSelectGenre && onSelectGenre(genre.id, 'movie'); setActiveMenu(null); }}>
                     {genre.name}
                   </button>
                 ))}
@@ -142,31 +112,16 @@ const Navbar = ({ onSelectMedia, onSelectPerson, onSelectGenre }) => {
         </div>
 
         {/* Diziler Sekmesi */}
-        <div 
-          className="nav-dropdown-wrapper"
-          onMouseEnter={() => setActiveMenu('series')}
-          onMouseLeave={() => setActiveMenu(null)}
-        >
+        <div className="nav-dropdown-wrapper" onMouseEnter={() => setActiveMenu('series')} onMouseLeave={() => setActiveMenu(null)}>
           <a href="#series" onClick={(e) => e.preventDefault()}>Diziler</a>
           {activeMenu === 'series' && (
             <div className="genre-dropdown-menu">
-              <button 
-                className="genre-dropdown-item all-btn"
-                onClick={() => { onSelectGenre && onSelectGenre(null); setActiveMenu(null); }}
-              >
+              <button className="genre-dropdown-item all-btn" onClick={() => { onSelectGenre && onSelectGenre(null); setActiveMenu(null); }}>
                 Tümü
               </button>
               <div className="dropdown-grid">
                 {genres.map((genre) => (
-                  <button
-                    key={genre.id}
-                    className="genre-dropdown-item"
-                    onClick={() => {
-                      // 2. Adım Düzenlemesi: Dizi olduğu için 'tv' gönderiyoruz
-                      onSelectGenre && onSelectGenre(genre.id, 'tv');
-                      setActiveMenu(null);
-                    }}
-                  >
+                  <button key={genre.id} className="genre-dropdown-item" onClick={() => { onSelectGenre && onSelectGenre(genre.id, 'tv'); setActiveMenu(null); }}>
                     {genre.name}
                   </button>
                 ))}
@@ -175,10 +130,23 @@ const Navbar = ({ onSelectMedia, onSelectPerson, onSelectGenre }) => {
           )}
         </div>
 
+        {/* 🌟 YENİ: LİSTEM BUTONU 🌟 */}
+        <a 
+          href="#mylist" 
+          onClick={(e) => { 
+            e.preventDefault(); 
+            if(onShowFavorites) onShowFavorites(); 
+          }}
+          style={{ fontWeight: '500', transition: 'color 0.2s ease' }}
+          onMouseEnter={(e) => e.target.style.color = '#e50914'}
+          onMouseLeave={(e) => e.target.style.color = 'white'}
+        >
+          Listem
+        </a>
+
         <a href="#popular">Popüler</a>
       </nav>
 
-      {/* Sağ Arama Kutusu & Profil */}
       <div className="nav-controls">
         <div className="search-container" ref={searchRef}>
           <div className="search-pill">
@@ -195,7 +163,6 @@ const Navbar = ({ onSelectMedia, onSelectPerson, onSelectGenre }) => {
             )}
           </div>
 
-          {/* Canlı Arama Sonuçları */}
           {showSearchDropdown && (
             <div className="search-dropdown">
               {isSearching ? (

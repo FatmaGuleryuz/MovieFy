@@ -1,7 +1,8 @@
 import MovieCard from "./MovieCard";
 import "./MovieRow.css";
 
-const MovieRow = ({ title, movies, isLoading, mediaType = "movie", onSelectMovie }) => {
+// 🌟 1. favorites ve onToggleFavorite proplarını bileşene ekledik
+const MovieRow = ({ title, movies, isLoading, mediaType = "movie", onSelectMovie, favorites, onToggleFavorite }) => {
   const hasMovies = Array.isArray(movies) && movies.length > 0;
 
   return (
@@ -18,7 +19,14 @@ const MovieRow = ({ title, movies, isLoading, mediaType = "movie", onSelectMovie
         ) : hasMovies ? (
           movies.map((movie) => (
             <div key={movie.id} className="movie-row-card-wrapper">
-              <MovieCard movie={movie} mediaType={mediaType} onSelect={onSelectMovie} />
+              {/* 🌟 2. O(1) maliyetli Set kontrolünü (favorites?.has) kartlara aktardık */}
+              <MovieCard 
+                movie={movie} 
+                mediaType={mediaType} 
+                onSelect={onSelectMovie} 
+                isFavorite={favorites?.has(movie.id)} 
+                onToggleFavorite={onToggleFavorite}
+              />
             </div>
           ))
         ) : (
