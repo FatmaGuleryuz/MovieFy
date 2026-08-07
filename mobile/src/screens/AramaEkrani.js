@@ -10,6 +10,7 @@ import {
   ScrollView,
   BackHandler,
   Keyboard,
+  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -63,25 +64,22 @@ export default function AramaEkrani({ navigation }) {
   // 2. Android & Cihaz Geri Tuşu Mantığı
   useEffect(() => {
     const onBackPress = () => {
-      // 1. Durum: Arama kutusunda metin var veya arama sonuçları gösteriliyorsa
       if (query.trim().length > 0) {
         Keyboard.dismiss();
         setQuery('');
         setResults([]);
         setIsInputFocused(false);
         if (inputRef.current) inputRef.current.blur();
-        return true; // Geri gitme işlemini engelle, arama ekranı ana haline dönsün
+        return true;
       }
 
-      // 2. Durum: Klavye açık veya arama barı odağındaysa (Son aramalar görünüyorsa)
       if (isInputFocused) {
         Keyboard.dismiss();
         setIsInputFocused(false);
         if (inputRef.current) inputRef.current.blur();
-        return true; // Geri gitme işlemini engelle, varsayılan önerilere dönsün
+        return true;
       }
 
-      // 3. Durum: Ekran zaten en temiz halinde ise standart geri gitme yap
       return false;
     };
 
@@ -170,6 +168,14 @@ export default function AramaEkrani({ navigation }) {
     }
   };
 
+  // Son aramalardan birine tıklandığında aramayı tetikler
+  const handleSelectHistoryItem = (historyItem) => {
+    setQuery(historyItem);
+    setIsInputFocused(false);
+    Keyboard.dismiss();
+    if (inputRef.current) inputRef.current.blur();
+  };
+
   // Arama Temizleme Butonuna Basıldığında
   const handleClearQuery = () => {
     setQuery('');
@@ -248,7 +254,6 @@ export default function AramaEkrani({ navigation }) {
           value={query}
           onChangeText={setQuery}
           onFocus={() => setIsInputFocused(true)}
-          onBlur={() => setIsInputFocused(false)}
           autoCorrect={false}
         />
         {query.length > 0 && (
@@ -273,6 +278,13 @@ export default function AramaEkrani({ navigation }) {
             showsVerticalScrollIndicator={false}
             onEndReached={loadMoreResults}
             onEndReachedThreshold={0.5}
+
+            // 🌟 FLATLIST PERFORMANS OPTİMİZASYONLARI
+            initialNumToRender={6}
+            maxToRenderPerBatch={8}
+            windowSize={5}
+            removeClippedSubviews={Platform.OS === 'android'}
+
             ListFooterComponent={
               loadingMore ? (
                 <ActivityIndicator size="small" color="#7709e5" style={{ marginVertical: 15 }} />
@@ -302,7 +314,7 @@ export default function AramaEkrani({ navigation }) {
                 <View key={idx} style={styles.historyRow}>
                   <Pressable
                     style={styles.historyTextPress}
-                    onPress={() => setQuery(historyItem)}
+                    onPress={() => handleSelectHistoryItem(historyItem)}
                   >
                     <Ionicons name="time-outline" size={18} color="#777" style={{ marginRight: 10 }} />
                     <Text style={styles.historyText}>{historyItem}</Text>

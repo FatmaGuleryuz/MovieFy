@@ -9,6 +9,7 @@ import {
   FlatList,
   Modal,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -304,6 +305,11 @@ export default function DetayEkrani({ route, navigation }) {
                           )}
                         </Pressable>
                       )}
+                      // 🌟 OPTİMİZASYON PARAMETRELERİ
+                      initialNumToRender={6}
+                      maxToRenderPerBatch={8}
+                      windowSize={5}
+                      removeClippedSubviews={Platform.OS === 'android'}
                     />
                   </View>
                 </Pressable>
@@ -359,6 +365,11 @@ export default function DetayEkrani({ route, navigation }) {
                       </View>
                     </Pressable>
                   )}
+                  // 🌟 OPTİMİZASYON PARAMETRELERİ
+                  initialNumToRender={6}
+                  maxToRenderPerBatch={8}
+                  windowSize={5}
+                  removeClippedSubviews={Platform.OS === 'android'}
                 />
               ) : (
                 <Text style={styles.emptyText}>Oyuncu bilgisi bulunamadı.</Text>
@@ -401,6 +412,11 @@ export default function DetayEkrani({ route, navigation }) {
                       </Pressable>
                     );
                   }}
+                  // 🌟 OPTİMİZASYON PARAMETRELERİ
+                  initialNumToRender={6}
+                  maxToRenderPerBatch={8}
+                  windowSize={5}
+                  removeClippedSubviews={Platform.OS === 'android'}
                 />
               ) : (
                 <Text style={styles.emptyText}>Benzer içerik bulunamadı.</Text>

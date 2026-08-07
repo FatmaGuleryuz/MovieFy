@@ -8,6 +8,7 @@ import {
   Pressable,
   ScrollView,
   Modal,
+  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -245,6 +246,13 @@ export default function KesfetEkrani({ navigation }) {
           scrollEventThrottle={16}
           onEndReached={loadMoreMovies}
           onEndReachedThreshold={0.5}
+          
+          // 🌟 FLATLIST PERFORMANS OPTİMİZASYONLARI
+          initialNumToRender={6}
+          maxToRenderPerBatch={8}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS === 'android'}
+
           ListFooterComponent={
             loadingMore ? (
               <ActivityIndicator size="small" color="#7709e5" style={{ marginVertical: 15 }} />
