@@ -63,20 +63,27 @@ The MovieFy platform consists of two main client applications:
 
 ## System Architecture
 
-The project is structured according to modular software engineering principles using the **Custom Hook + Service Pattern** architecture:
+The project is designed in accordance with modular software engineering principles using the **Custom Hook + Service Pattern** architecture:
 
-[ UI Screens / Components ]
-           │
-           ▼
-[ Custom Hooks (e.g. useMultiFavorites) ]
-           │
-           ├──► [ Storage Layer (AsyncStorage) ]
-           │
-           ▼
-[ API Services Layer (axios + TMDB Endpoints) ]
-
----
-
+```text
++-------------------------------------------------------+
+|                UI Screens / Components                |
+|  (HomeScreen, DiscoverScreen, SearchScreen, etc.)     |
++-------------------------------------------------------+
+                            │
+                            ▼
++-------------------------------------------------------+
+|                    Custom Hooks                       |
+|         (useMultiFavorites, useMovieData)             |
++-------------------------------------------------------+
+                            │
+            ┌───────────────┴───────────────┐
+            ▼                               ▼
++-----------------------+       +-----------------------+
+|     Storage Layer     |       |   API Services Layer  |
+|     (AsyncStorage)    |       | (Axios + TMDB Endpts) |
++-----------------------+       +-----------------------+
+```
 ## Technologies & Libraries
 
 | Category | Technology / Library | Purpose |
@@ -91,8 +98,9 @@ The project is structured according to modular software engineering principles u
 
 ---
 
+```markdown
 ## Project Directory Structure
-
+```text
 staj_projesi/
 └── mobile/
     ├── assets/                  # Logos, splash screen, and app assets
@@ -129,7 +137,7 @@ staj_projesi/
     ├── eas.json                 # EAS Build (APK) configuration
     ├── package.json             # Dependencies and scripts
     └── README.md                # Project documentation
-
+```
 ---
 
 ## Performance & Optimization Metrics
@@ -158,3 +166,9 @@ cd staj_projesi/mobile
 
 # Install dependencies
 npm install
+
+# Create a .env file inside the mobile directory and set your TMDB API key.
+EXPO_PUBLIC_TMDB_API_KEY=YOUR_TMDB_API_KEY
+
+#Launching the App
+npx expo start 
