@@ -57,7 +57,7 @@ The MovieFy platform consists of two main client applications:
 
 | Home Screen | Discover & Filter | Smart Search | Details & Trailer | Favorites / My Lists |
 | :---: | :---: | :---: | :---: | :---: |
-| <img src="assets/screenshots/home.jpeg" width="180"> | <img src="assets/screenshots/discover.jpeg" width="180"> | <img src="assets/screenshots/search.jpeg" width="180"> | <img src="assets/screenshots/detail.jpeg" width="180"> | <img src="assets/screenshots/favorites.jpeg" width="180"> |
+| <img src="mobile/assets/screenshots/home.jpeg" width="180"> | <img src="mobile/assets/screenshots/discover.jpeg" width="180"> | <img src="mobile/assets/screenshots/search.jpeg" width="180"> | <img src="mobile/assets/screenshots/detail.jpeg" width="180"> | <img src="mobile/assets/screenshots/favorites.jpeg" width="180"> |
 
 ---
 
